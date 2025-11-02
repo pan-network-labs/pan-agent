@@ -40,6 +40,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+// CORS响应头配置
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// 处理预检请求（OPTIONS）
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: getCorsHeaders() });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. 解析请求体
@@ -52,7 +67,10 @@ export async function POST(request: NextRequest) {
         code: 400,
         msg: '缺少必需的参数: prompt',
         data: { data: '' }
-      }, { status: 400 });
+      }, { 
+        status: 400,
+        headers: getCorsHeaders()
+      });
     }
 
     // 3. 获取API密钥（从环境变量）
@@ -62,7 +80,10 @@ export async function POST(request: NextRequest) {
         code: 500,
         msg: '未配置API密钥，请设置环境变量 ZHIPUAI_API_KEY',
         data: { data: '' }
-      }, { status: 500 });
+      }, { 
+        status: 500,
+        headers: getCorsHeaders()
+      });
     }
 
     // 4. 调用智谱AI API
@@ -91,7 +112,10 @@ export async function POST(request: NextRequest) {
         code: response.status,
         msg: '图片生成失败',
         data: { data: errorData }
-      }, { status: response.status });
+      }, { 
+        status: response.status,
+        headers: getCorsHeaders()
+      });
     }
 
     // 6. 解析成功响应并提取图片URL
@@ -103,6 +127,8 @@ export async function POST(request: NextRequest) {
       code: 200,
       msg: 'success',
       data: { data: imageUrl }
+    }, {
+      headers: getCorsHeaders()
     });
   } catch (error) {
     console.error('生成图片时发生错误:', error);
@@ -110,7 +136,10 @@ export async function POST(request: NextRequest) {
       code: 500,
       msg: '服务器内部错误',
       data: { data: error instanceof Error ? error.message : '未知错误' }
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: getCorsHeaders()
+    });
   }
 }
 
