@@ -110,18 +110,59 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     console.log('交易信息:');
     console.log('交易哈希:', tsHash);
     console.log('发送方:', tx.from);
-    console.log('接收方:', tx.to);
+    console.log('接收方（合约地址）:', tx.to);
     console.log('交易金额:', ethers.formatEther(tx.value), 'BNB');
     console.log('交易状态:', receipt.status === 1 ? '成功' : '失败');
 
-    // 7. 验证收款地址和金额
-    const toAddress = tx.to?.toLowerCase();
+    // 7. 解析智能合约函数调用数据
+    // 如果交易有输入数据，说明是智能合约调用
+    let recipientAddress: string | null = null;
+    
+    if (tx.data && tx.data !== '0x') {
+      try {
+        // 定义 makePayment 函数接口
+        const iface = new ethers.Interface([
+          'function makePayment(address recipient, string memory description) payable returns (uint256 tokenId)'
+        ]);
+        
+        // 解码交易输入数据
+        const decoded = iface.parseTransaction({ data: tx.data, value: tx.value });
+        
+        if (decoded && decoded.name === 'makePayment') {
+          // 提取 recipient 参数（第一个参数）
+          recipientAddress = decoded.args[0];
+          console.log('智能合约调用函数:', decoded.name);
+          console.log('recipient 参数:', recipientAddress);
+          console.log('description 参数:', decoded.args[1]);
+        }
+      } catch (decodeError) {
+        console.warn('无法解码交易数据，可能不是 makePayment 调用:', decodeError);
+        // 如果解码失败，可能是其他类型的交易，需要判断
+      }
+    }
+
+    // 8. 验证收款地址和金额
     const expectedAddress = PAYMENT_CONFIG.address.toLowerCase();
     const amount = parseFloat(ethers.formatEther(tx.value));
     const minAmount = parseFloat(PAYMENT_CONFIG.minAmount);
 
-    if (toAddress !== expectedAddress) {
-      console.log(`收款地址不匹配: 期望 ${expectedAddress}, 实际 ${toAddress}`);
+    // 如果有 recipient 地址（智能合约调用），验证 recipient；否则验证交易 to 地址
+    let isValidRecipient = false;
+    
+    if (recipientAddress) {
+      // 智能合约调用，验证 recipient 参数
+      const recipientLower = recipientAddress.toLowerCase();
+      isValidRecipient = recipientLower === expectedAddress;
+      console.log(`验证 recipient: 期望 ${expectedAddress}, 实际 ${recipientLower}`);
+    } else {
+      // 直接转账，验证 to 地址
+      const toAddress = tx.to?.toLowerCase();
+      isValidRecipient = toAddress === expectedAddress;
+      console.log(`验证 to 地址: 期望 ${expectedAddress}, 实际 ${toAddress}`);
+    }
+
+    if (!isValidRecipient) {
+      console.log('收款地址不匹配');
       return { valid: false, error: '收款地址不匹配' };
     }
 
@@ -130,7 +171,7 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
       return { valid: false, error: '交易金额不足' };
     }
 
-    // 8. 验证交易是否成功
+    // 9. 验证交易是否成功
     if (receipt.status !== 1) {
       return { valid: false, error: '交易失败' };
     }
