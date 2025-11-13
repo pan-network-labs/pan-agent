@@ -17,12 +17,29 @@ interface EthereumProvider {
   request(args: { method: string; params?: any[] }): Promise<any>;
   on(event: string, handler: (...args: any[]) => void): void;
   removeListener(event: string, handler: (...args: any[]) => void): void;
+  isMetaMask?: boolean;
+  selectedAddress?: string;
 }
 
 declare global {
   interface Window {
-    ethereum?: EthereumProvider;
+    ethereum?: EthereumProvider | EthereumProvider[];
   }
+}
+
+// 获取正确的 ethereum 提供者（处理多个钱包的情况）
+function getEthereumProvider(): EthereumProvider | null {
+  if (typeof window === 'undefined' || !window.ethereum) {
+    return null;
+  }
+  
+  // 如果 ethereum 是数组，优先选择 MetaMask
+  if (Array.isArray(window.ethereum)) {
+    const metaMask = window.ethereum.find((provider: any) => provider.isMetaMask);
+    return metaMask || window.ethereum[0];
+  }
+  
+  return window.ethereum;
 }
 
 export default function Home() {
@@ -169,15 +186,42 @@ export default function Home() {
 
     setPaymentLoading(true);
     try {
-      // 检查是否安装了 MetaMask
-      if (typeof window.ethereum === 'undefined') {
+      // 获取正确的 ethereum 提供者
+      const ethereum = getEthereumProvider();
+      
+      if (!ethereum) {
         throw new Error('请安装 MetaMask 钱包');
       }
 
-      // 请求连接钱包
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      });
+      // 请求连接钱包（添加错误处理）
+      let accounts: string[];
+      try {
+        accounts = await ethereum.request({
+          method: 'eth_requestAccounts',
+        });
+      } catch (error: any) {
+        // 处理用户拒绝连接的情况
+        if (error.code === 4001) {
+          throw new Error('用户拒绝了连接钱包请求');
+        }
+        // 处理 JSON-RPC 内部错误
+        if (error.code === -32603) {
+          console.error('钱包内部错误，尝试重新连接:', error);
+          // 等待一下再重试
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            accounts = await ethereum.request({
+              method: 'eth_requestAccounts',
+            });
+          } catch (retryError: any) {
+            throw new Error(`连接钱包失败，请刷新页面重试: ${retryError.message || '未知错误'}`);
+          }
+        } else {
+          // 处理其他错误
+          console.error('连接钱包失败:', error);
+          throw new Error(`连接钱包失败: ${error.message || '未知错误'}`);
+        }
+      }
 
       if (!accounts || accounts.length === 0) {
         throw new Error('请连接钱包');
@@ -185,45 +229,60 @@ export default function Home() {
 
       const fromAddress = accounts[0];
 
-      // 获取网络信息
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      // 获取网络信息（添加错误处理）
+      let chainId: string;
+      try {
+        chainId = await ethereum.request({ method: 'eth_chainId' });
+      } catch (error: any) {
+        console.error('获取链 ID 失败:', error);
+        throw new Error(`获取网络信息失败: ${error.message || '未知错误'}`);
+      }
+      
       // BSC Testnet chainId: 0x61 (97)
       const bscTestnetChainId = '0x61';
       
       if (chainId !== bscTestnetChainId) {
         // 尝试切换到 BSC Testnet
         try {
-          await window.ethereum.request({
+          await ethereum.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: bscTestnetChainId }],
           });
         } catch (switchError: any) {
           // 如果链不存在，添加链
           if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [
-                {
-                  chainId: bscTestnetChainId,
-                  chainName: 'BSC Testnet',
-                  nativeCurrency: {
-                    name: 'BNB',
-                    symbol: 'BNB',
-                    decimals: 18,
+            try {
+              await ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [
+                  {
+                    chainId: bscTestnetChainId,
+                    chainName: 'BSC Testnet',
+                    nativeCurrency: {
+                      name: 'BNB',
+                      symbol: 'BNB',
+                      decimals: 18,
+                    },
+                    rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
+                    blockExplorerUrls: ['https://testnet.bscscan.com'],
                   },
-                  rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
-                  blockExplorerUrls: ['https://testnet.bscscan.com'],
-                },
-              ],
-            });
+                ],
+              });
+            } catch (addError: any) {
+              console.error('添加链失败:', addError);
+              throw new Error(`添加 BSC Testnet 失败: ${addError.message || '未知错误'}`);
+            }
+          } else if (switchError.code === 4001) {
+            throw new Error('用户拒绝了切换网络请求');
           } else {
-            throw switchError;
+            console.error('切换网络失败:', switchError);
+            throw new Error(`切换网络失败: ${switchError.message || '未知错误'}`);
           }
         }
       }
 
       // 检查地址是否是合约地址（通过检查 code 是否为空）
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(ethereum);
       const code = await provider.getCode(paymentInfo.address);
       const isContract = code && code !== '0x';
       
@@ -270,7 +329,7 @@ export default function Home() {
         // 估算 gas（合约调用需要更多 gas）
         let gasLimit = '0x186a0'; // 默认 100000
         try {
-          const gasEstimate = await window.ethereum.request({
+          const gasEstimate = await ethereum.request({
             method: 'eth_estimateGas',
             params: [
               {
@@ -287,48 +346,81 @@ export default function Home() {
           console.warn('Gas 估算失败，使用默认值:', error);
         }
 
-        // 发起合约调用交易
-        txHash = await window.ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [
-            {
-              from: fromAddress,
-              to: contractAddress,
-              value: amountHex,
-              data: data, // 包含合约方法调用数据（包括 referrer）
-              gas: gasLimit,
-            },
-          ],
-        });
+        // 发起合约调用交易（添加错误处理）
+        try {
+          txHash = await ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [
+              {
+                from: fromAddress,
+                to: contractAddress,
+                value: amountHex,
+                data: data, // 包含合约方法调用数据（包括 referrer）
+                gas: gasLimit,
+              },
+            ],
+          });
+        } catch (error: any) {
+          if (error.code === 4001) {
+            throw new Error('用户拒绝了交易请求');
+          }
+          if (error.code === -32603) {
+            throw new Error('钱包内部错误，请刷新页面重试');
+          }
+          console.error('发送交易失败:', error);
+          throw new Error(`发送交易失败: ${error.message || '未知错误'}`);
+        }
       } else {
         // 如果是普通钱包地址（EOA），使用简单转账（不支持 referrer）
         console.warn('地址是普通钱包地址，使用简单转账（不支持 referrer）');
         
-        txHash = await window.ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [
-            {
-              from: fromAddress,
-              to: paymentInfo.address,
-              value: amountHex,
-              gas: '0x5208', // 21000 gas limit for simple transfer
-            },
-          ],
-        });
+        try {
+          txHash = await ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [
+              {
+                from: fromAddress,
+                to: paymentInfo.address,
+                value: amountHex,
+                gas: '0x5208', // 21000 gas limit for simple transfer
+              },
+            ],
+          });
+        } catch (error: any) {
+          if (error.code === 4001) {
+            throw new Error('用户拒绝了交易请求');
+          }
+          if (error.code === -32603) {
+            throw new Error('钱包内部错误，请刷新页面重试');
+          }
+          console.error('发送交易失败:', error);
+          throw new Error(`发送交易失败: ${error.message || '未知错误'}`);
+        }
       }
 
       console.log('支付交易已发送:', txHash);
 
       // 等待交易确认
       let receipt = null;
-      while (!receipt) {
-        receipt = await window.ethereum.request({
-          method: 'eth_getTransactionReceipt',
-          params: [txHash],
-        });
+      let retryCount = 0;
+      const maxRetries = 30; // 最多等待 60 秒
+      while (!receipt && retryCount < maxRetries) {
+        try {
+          receipt = await ethereum.request({
+            method: 'eth_getTransactionReceipt',
+            params: [txHash],
+          });
+        } catch (error) {
+          console.warn('查询交易收据失败，重试中...', error);
+        }
         if (!receipt) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
+          retryCount++;
         }
+      }
+      
+      if (!receipt) {
+        throw new Error('交易确认超时，请手动检查交易状态');
       }
 
       console.log('交易已确认:', receipt);
