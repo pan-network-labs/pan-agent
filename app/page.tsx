@@ -53,6 +53,7 @@ function getEthereumProvider(): EthereumProvider | null {
 }
 
 // 安全地请求钱包连接（避免 evmAsk.js 错误，特别针对 HTTPS 环境）
+// 注意：此函数必须在用户点击事件中直接调用，不能有任何延迟或包装
 async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]> {
   // 首先尝试使用 eth_accounts（如果已经连接过，不会触发选择器）
   try {
@@ -78,62 +79,66 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
     isProduction,
   });
 
-  // 在 HTTPS 环境下，添加更长的延迟，确保用户交互已完成
-  // MetaMask 在 HTTPS 环境下的安全策略更严格
-  const delay = isHTTPS ? 300 : 100;
-  await new Promise(resolve => setTimeout(resolve, delay));
+  // 关键：在 HTTPS 环境下，不要添加延迟！
+  // MetaMask 要求用户交互必须直接触发，任何延迟都会导致用户交互上下文丢失
+  // 只有在本地环境才添加小延迟（用于调试）
+  if (!isHTTPS) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   
   try {
-    // 在 HTTPS 环境下，优先使用 wallet_requestPermissions（更稳定）
-    if (isHTTPS) {
-      try {
-        console.log('HTTPS 环境，尝试使用 wallet_requestPermissions');
-        await ethereum.request({
-          method: 'wallet_requestPermissions',
-          params: [{ eth_accounts: {} }],
-        });
-        // 权限请求成功后，获取账户
-        const accounts = await ethereum.request({
-          method: 'eth_accounts',
-        });
-        if (accounts && accounts.length > 0) {
-          console.log('通过 wallet_requestPermissions 获取到账户:', accounts);
-          return accounts;
-        }
-      } catch (permError: any) {
-        console.warn('wallet_requestPermissions 失败，回退到 eth_requestAccounts:', permError);
-        // 如果权限请求失败，回退到标准方法
-      }
-    }
-    
-    // 标准方法：使用 eth_requestAccounts
-    return await ethereum.request({
+    // 在 HTTPS 环境下，直接使用 eth_requestAccounts（不要使用 wallet_requestPermissions）
+    // wallet_requestPermissions 在某些情况下也会触发 evmAsk.js 错误
+    // eth_requestAccounts 是 EIP-1193 标准方法，更可靠
+    console.log('请求连接钱包...');
+    const accounts = await ethereum.request({
       method: 'eth_requestAccounts',
     });
-  } catch (error: any) {
-    // 如果失败，再次尝试使用 eth_accounts（可能连接已建立）
-    if (error.code === -32603 || error.message?.includes('Unexpected error') || error.message?.includes('evmAsk') || error.message?.includes('selectExtension')) {
-      console.warn('eth_requestAccounts 失败（可能是扩展冲突），等待后重试 eth_accounts:', error);
-      // 在 HTTPS 环境下等待更长时间
-      const retryDelay = isHTTPS ? 1000 : 500;
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-      try {
-        const accounts = await ethereum.request({
-          method: 'eth_accounts',
-        });
-        if (accounts && accounts.length > 0) {
-          console.log('通过重试 eth_accounts 获取到账户:', accounts);
-          return accounts;
-        }
-        // 如果 eth_accounts 也失败，提供更详细的错误信息
-        throw new Error('钱包未连接。请在 MetaMask 扩展中手动连接此网站，然后刷新页面重试');
-      } catch (accountsError: any) {
-        const errorMsg = isHTTPS 
-          ? '无法连接钱包（HTTPS 环境）。请确保：1) MetaMask 已安装并解锁 2) 在 MetaMask 中手动连接此网站 3) 刷新页面重试'
-          : '无法连接钱包，请确保 MetaMask 已安装并解锁，然后刷新页面重试';
-        throw new Error(errorMsg);
-      }
+    
+    if (accounts && accounts.length > 0) {
+      console.log('成功获取账户:', accounts);
+      return accounts;
     }
+    
+    throw new Error('未获取到账户');
+  } catch (error: any) {
+    // 处理用户拒绝
+    if (error.code === 4001) {
+      throw new Error('用户拒绝了连接钱包请求');
+    }
+    
+    // 处理 evmAsk.js 错误（-32603 或其他内部错误）
+    if (error.code === -32603 || 
+        error.message?.includes('Unexpected error') || 
+        error.message?.includes('evmAsk') || 
+        error.message?.includes('selectExtension')) {
+      console.error('钱包连接错误（evmAsk.js）:', error);
+      
+      // 在 HTTPS 环境下，等待后重试 eth_accounts（可能连接已在后台建立）
+      if (isHTTPS) {
+        console.log('HTTPS 环境，等待后重试 eth_accounts...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const accounts = await ethereum.request({
+            method: 'eth_accounts',
+          });
+          if (accounts && accounts.length > 0) {
+            console.log('通过重试 eth_accounts 获取到账户:', accounts);
+            return accounts;
+          }
+        } catch (retryError) {
+          console.warn('重试 eth_accounts 也失败:', retryError);
+        }
+      }
+      
+      // 提供详细的错误信息和解决建议
+      const errorMsg = isHTTPS
+        ? '钱包连接失败（HTTPS 环境）。请尝试：1) 在 MetaMask 扩展中手动连接此网站 2) 刷新页面 3) 禁用其他钱包扩展 4) 确保 MetaMask 已解锁'
+        : '钱包连接失败。请尝试：1) 刷新页面 2) 确保只启用 MetaMask 扩展 3) 在 MetaMask 中手动连接此网站';
+      throw new Error(errorMsg);
+    }
+    
+    // 其他错误直接抛出
     throw error;
   }
 }
