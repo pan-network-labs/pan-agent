@@ -35,11 +35,69 @@ function getEthereumProvider(): EthereumProvider | null {
   
   // 如果 ethereum 是数组，优先选择 MetaMask
   if (Array.isArray(window.ethereum)) {
+    // 优先查找 MetaMask
     const metaMask = window.ethereum.find((provider: any) => provider.isMetaMask);
-    return metaMask || window.ethereum[0];
+    if (metaMask) {
+      return metaMask;
+    }
+    // 如果没有 MetaMask，使用第一个
+    return window.ethereum[0];
+  }
+  
+  // 单个提供者，检查是否是 MetaMask
+  if (window.ethereum.isMetaMask) {
+    return window.ethereum;
   }
   
   return window.ethereum;
+}
+
+// 安全地请求钱包连接（避免 evmAsk.js 错误）
+async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]> {
+  // 首先尝试使用 eth_accounts（如果已经连接过，不会触发选择器）
+  try {
+    const existingAccounts = await ethereum.request({
+      method: 'eth_accounts',
+    });
+    if (existingAccounts && existingAccounts.length > 0) {
+      console.log('使用已连接的账户:', existingAccounts);
+      return existingAccounts;
+    }
+  } catch (error) {
+    console.warn('eth_accounts 查询失败:', error);
+  }
+
+  // 如果没有已连接的账户，尝试请求连接
+  // 添加小延迟，确保用户交互已完成
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  try {
+    // 方法1: 直接使用 eth_requestAccounts
+    return await ethereum.request({
+      method: 'eth_requestAccounts',
+    });
+  } catch (error: any) {
+    // 如果失败，再次尝试使用 eth_accounts（可能连接已建立）
+    if (error.code === -32603 || error.message?.includes('Unexpected error') || error.message?.includes('evmAsk')) {
+      console.warn('eth_requestAccounts 失败（可能是扩展冲突），再次尝试 eth_accounts:', error);
+      // 等待一下，让钱包扩展有时间处理
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        const accounts = await ethereum.request({
+          method: 'eth_accounts',
+        });
+        if (accounts && accounts.length > 0) {
+          console.log('通过 eth_accounts 获取到账户:', accounts);
+          return accounts;
+        }
+        // 如果 eth_accounts 也失败，抛出原始错误
+        throw new Error('钱包未连接，请手动在 MetaMask 中连接此网站');
+      } catch (accountsError: any) {
+        throw new Error('无法连接钱包，请确保 MetaMask 已安装并解锁，然后刷新页面重试');
+      }
+    }
+    throw error;
+  }
 }
 
 export default function Home() {
@@ -193,33 +251,24 @@ export default function Home() {
         throw new Error('请安装 MetaMask 钱包');
       }
 
-      // 请求连接钱包（添加错误处理）
+      // 请求连接钱包（使用安全方法，避免 evmAsk.js 错误）
       let accounts: string[];
       try {
-        accounts = await ethereum.request({
-          method: 'eth_requestAccounts',
-        });
+        accounts = await safeRequestAccounts(ethereum);
       } catch (error: any) {
         // 处理用户拒绝连接的情况
         if (error.code === 4001) {
           throw new Error('用户拒绝了连接钱包请求');
         }
-        // 处理 JSON-RPC 内部错误
-        if (error.code === -32603) {
-          console.error('钱包内部错误，尝试重新连接:', error);
-          // 等待一下再重试
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          try {
-            accounts = await ethereum.request({
-              method: 'eth_requestAccounts',
-            });
-          } catch (retryError: any) {
-            throw new Error(`连接钱包失败，请刷新页面重试: ${retryError.message || '未知错误'}`);
-          }
+        // 处理 JSON-RPC 内部错误或 evmAsk.js 错误
+        if (error.code === -32603 || error.message?.includes('Unexpected error') || error.message?.includes('evmAsk')) {
+          console.error('钱包连接错误（可能是扩展冲突）:', error);
+          // 提供更详细的错误信息
+          throw new Error('钱包连接失败。请尝试：1) 刷新页面 2) 确保只启用 MetaMask 扩展 3) 在 MetaMask 中手动连接此网站');
         } else {
           // 处理其他错误
           console.error('连接钱包失败:', error);
-          throw new Error(`连接钱包失败: ${error.message || '未知错误'}`);
+          throw new Error(error.message || `连接钱包失败: ${error.message || '未知错误'}`);
         }
       }
 
