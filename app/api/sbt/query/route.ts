@@ -172,18 +172,20 @@ export async function GET(request: NextRequest) {
             const events = await contract.queryFilter(filter);
             
             for (const event of events) {
-              if (event.args && event.args.tokenId) {
-                const tokenIdString = event.args.tokenId.toString();
+              // 类型守卫：检查是否是 EventLog 类型（有 args 属性）
+              if ('args' in event && event.args && 'tokenId' in event.args) {
+                const eventLog = event as ethers.EventLog;
+                const tokenIdString = eventLog.args.tokenId.toString();
                 if (!tokenIds.includes(tokenIdString)) {
                   tokenIds.push(tokenIdString);
                   
                   // 验证 token 是否仍属于该地址
                   try {
-                    const owner = await contract.ownerOf(event.args.tokenId);
+                    const owner = await contract.ownerOf(eventLog.args.tokenId);
                     if (owner.toLowerCase() === address.toLowerCase()) {
                       // 尝试获取 token URI
                       try {
-                        const tokenURI = await contract.tokenURI(event.args.tokenId);
+                        const tokenURI = await contract.tokenURI(eventLog.args.tokenId);
                         tokenDetails.push({ tokenId: tokenIdString, tokenURI });
                       } catch {
                         tokenDetails.push({ tokenId: tokenIdString });
@@ -330,8 +332,8 @@ async function getSBTsList(request: NextRequest, address: string) {
       // 转换数据格式
       const formattedList = tokenIds.map((tokenId: bigint, index: number) => {
         const info = paymentInfos[index] || {};
-        const amount = info.amount || 0n;
-        const timestamp = info.timestamp || 0n;
+        const amount = info.amount || BigInt(0);
+        const timestamp = info.timestamp || BigInt(0);
         const timestampNum = Number(timestamp);
         const timestampDate = timestampNum > 0 ? new Date(timestampNum * 1000).toISOString() : null;
         
@@ -404,8 +406,8 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
     try {
       const paymentInfo = await contract.getPaymentInfo(tokenId);
       
-      const amount = paymentInfo.amount || 0n;
-      const timestamp = paymentInfo.timestamp || 0n;
+      const amount = paymentInfo.amount || BigInt(0);
+      const timestamp = paymentInfo.timestamp || BigInt(0);
       const timestampNum = Number(timestamp);
       const timestampDate = timestampNum > 0 ? new Date(timestampNum * 1000).toISOString() : null;
       

@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
-import { createX402Response } from '../../../x402-utils';
+import { createX402Response } from '../../x402-utils';
 import { callPromptAgentWithPayment } from '../../a2a-agent/agent-client';
 
 // CORS响应头配置
