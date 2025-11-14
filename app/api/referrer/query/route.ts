@@ -15,6 +15,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import PAYMENT_SBT_ABI from '../../../../PAYMENT_SBT_ABI.json';
 
+// CORS响应头配置（允许所有来源）
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// 辅助函数：为响应添加 CORS 头
+function jsonResponse(data: any, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...getCorsHeaders(),
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+// 处理预检请求（OPTIONS）
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: getCorsHeaders() });
+}
+
 // 获取支付配置
 function getPaymentConfig() {
   return {
@@ -31,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     const config = getPaymentConfig();
     if (!config.contractAddress) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: 'PAYMENT_CONTRACT_ADDRESS 未配置',
@@ -48,7 +74,7 @@ export async function GET(request: NextRequest) {
     if (queryType === 'stats') {
       // 查询指定推荐码的统计信息
       if (!referrer) {
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: '缺少 referrer 参数',
@@ -76,7 +102,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`推荐码 ${referrer} 的推荐次数: ${count}`);
 
-        return NextResponse.json({
+        return jsonResponse({
           success: true,
           data: {
             referrer: referrer,
@@ -85,7 +111,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (error: any) {
         console.error('查询推荐码统计失败:', error);
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: `查询推荐码统计失败: ${error?.message || '未知错误'}`,
@@ -118,7 +144,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`查询到 ${referrerList.length} 个推荐码`);
 
-        return NextResponse.json({
+        return jsonResponse({
           success: true,
           data: {
             total: referrerList.length,
@@ -127,7 +153,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (error: any) {
         console.error('查询推荐码列表失败:', error);
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: `查询推荐码列表失败: ${error?.message || '未知错误'}`,
@@ -138,7 +164,7 @@ export async function GET(request: NextRequest) {
     } else if (queryType === 'tokens') {
       // 查询指定推荐码关联的所有 Token ID
       if (!referrer) {
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: '缺少 referrer 参数',
@@ -166,7 +192,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`推荐码 ${referrer} 关联了 ${tokenIdList.length} 个 Token`);
 
-        return NextResponse.json({
+        return jsonResponse({
           success: true,
           data: {
             referrer: referrer,
@@ -176,7 +202,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (error: any) {
         console.error('查询推荐码关联 Token 失败:', error);
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: `查询推荐码关联 Token 失败: ${error?.message || '未知错误'}`,
@@ -185,7 +211,7 @@ export async function GET(request: NextRequest) {
         );
       }
     } else {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: `不支持的查询类型: ${queryType}。支持的类型: stats, list, tokens`,
@@ -195,7 +221,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('查询推荐信息时发生错误:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : '未知错误',

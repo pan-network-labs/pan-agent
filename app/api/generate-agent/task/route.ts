@@ -23,7 +23,7 @@ import { ethers } from 'ethers';
 import { createX402Response } from '../../x402-utils';
 import { callPromptAgentWithPayment } from '../../a2a-agent/agent-client';
 
-// CORS响应头配置
+// CORS响应头配置（允许所有来源）
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
         },
       },
       {
-        headers: getCorsHeaders(),
+        headers: getCorsHeaders(origin),
       }
     );
   } catch (error) {

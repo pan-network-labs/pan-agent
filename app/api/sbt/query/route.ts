@@ -10,6 +10,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import PAYMENT_SBT_ABI from '../../../../PAYMENT_SBT_ABI.json';
 
+// CORS响应头配置（允许所有来源）
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// 辅助函数：为响应添加 CORS 头
+function jsonResponse(data: any, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...getCorsHeaders(),
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+// 处理预检请求（OPTIONS）
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: getCorsHeaders() });
+}
+
 // 获取支付配置
 function getPaymentConfig() {
   return {
@@ -29,13 +55,13 @@ export async function GET(request: NextRequest) {
     if (queryType === 'stats') {
       // 快速统计：使用 getRarityStatsByOwner
       if (!address) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: '缺少 address 参数' },
           { status: 400 }
         );
       }
       if (!ethers.isAddress(address)) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: '无效的地址格式' },
           { status: 400 }
         );
@@ -46,13 +72,13 @@ export async function GET(request: NextRequest) {
     if (queryType === 'list') {
       // 完整列表：使用 getSBTsByAddress
       if (!address) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: '缺少 address 参数' },
           { status: 400 }
         );
       }
       if (!ethers.isAddress(address)) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: '无效的地址格式' },
           { status: 400 }
         );
@@ -63,7 +89,7 @@ export async function GET(request: NextRequest) {
     if (queryType === 'detail') {
       // 单个详情：使用 getPaymentInfo
       if (!tokenId) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: '缺少 tokenId 参数' },
           { status: 400 }
         );
@@ -73,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     // 默认：兼容原有查询逻辑
     if (!address) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: '缺少 address 参数',
@@ -84,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     // 验证地址格式
     if (!ethers.isAddress(address)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: '无效的地址格式',
@@ -95,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     const config = getPaymentConfig();
     if (!config.contractAddress) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: 'PAYMENT_CONTRACT_ADDRESS 未配置',
@@ -114,7 +140,7 @@ export async function GET(request: NextRequest) {
       balance = await contract.balanceOf(address);
     } catch (error: any) {
       console.error('查询余额失败:', error);
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: `查询余额失败: ${error?.message || '未知错误'}`,
@@ -237,7 +263,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       data: {
         address,
@@ -251,7 +277,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('查询 SBT 时发生错误:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : '未知错误',
@@ -266,7 +292,7 @@ async function getRarityStats(request: NextRequest, address: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
         { status: 500 }
       );
@@ -278,7 +304,7 @@ async function getRarityStats(request: NextRequest, address: string) {
     try {
       const result = await contract.getRarityStatsByOwner(address);
       
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         data: {
           address,
@@ -290,7 +316,7 @@ async function getRarityStats(request: NextRequest, address: string) {
       });
     } catch (error: any) {
       console.error('查询统计信息失败:', error);
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: `查询统计信息失败: ${error?.message || '未知错误'}`,
@@ -300,7 +326,7 @@ async function getRarityStats(request: NextRequest, address: string) {
     }
   } catch (error) {
     console.error('查询统计信息时发生错误:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : '未知错误',
@@ -315,7 +341,7 @@ async function getSBTsList(request: NextRequest, address: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
         { status: 500 }
       );
@@ -350,7 +376,7 @@ async function getSBTsList(request: NextRequest, address: string) {
         };
       });
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         data: {
           address,
@@ -361,7 +387,7 @@ async function getSBTsList(request: NextRequest, address: string) {
       });
     } catch (error: any) {
       console.error('查询 SBT 列表失败:', error);
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: `查询 SBT 列表失败: ${error?.message || '未知错误'}`,
@@ -371,7 +397,7 @@ async function getSBTsList(request: NextRequest, address: string) {
     }
   } catch (error) {
     console.error('查询 SBT 列表时发生错误:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : '未知错误',
@@ -386,7 +412,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
         { status: 500 }
       );
@@ -394,7 +420,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
 
     // 验证 tokenId 格式
     if (!/^\d+$/.test(tokenId)) {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: '无效的 tokenId 格式' },
         { status: 400 }
       );
@@ -411,7 +437,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
       const timestampNum = Number(timestamp);
       const timestampDate = timestampNum > 0 ? new Date(timestampNum * 1000).toISOString() : null;
       
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         data: {
           tokenId,
@@ -428,7 +454,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
       });
     } catch (error: any) {
       console.error('查询支付详情失败:', error);
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: `查询支付详情失败: ${error?.message || '未知错误'}`,
@@ -438,7 +464,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
     }
   } catch (error) {
     console.error('查询支付详情时发生错误:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : '未知错误',
