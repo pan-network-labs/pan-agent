@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ethers } from 'ethers';
 
@@ -70,13 +70,11 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
 
   // 检查是否是 HTTPS 环境（Vercel 部署）
   const isHTTPS = window.location.protocol === 'https:';
-  const isProduction = !window.location.hostname.includes('localhost');
   
   console.log('环境信息:', {
     protocol: window.location.protocol,
     hostname: window.location.hostname,
     isHTTPS,
-    isProduction,
   });
 
   // 关键：在 HTTPS 环境下，不要添加延迟！
@@ -87,17 +85,77 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
   }
   
   try {
-    // 在 HTTPS 环境下，直接使用 eth_requestAccounts（不要使用 wallet_requestPermissions）
-    // wallet_requestPermissions 在某些情况下也会触发 evmAsk.js 错误
-    // eth_requestAccounts 是 EIP-1193 标准方法，更可靠
-    console.log('请求连接钱包...');
-    const accounts = await ethereum.request({
-      method: 'eth_requestAccounts',
-    });
-    
-    if (accounts && accounts.length > 0) {
-      console.log('成功获取账户:', accounts);
-      return accounts;
+    // 尝试多种方法，按优先级顺序
+    // 方法1：直接使用 eth_requestAccounts（EIP-1193 标准）
+    console.log('尝试方法1: eth_requestAccounts');
+    try {
+      const accounts = await ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+      
+      if (accounts && accounts.length > 0) {
+        console.log('✅ 通过 eth_requestAccounts 成功获取账户:', accounts);
+        return accounts;
+      }
+    } catch (reqError: any) {
+      // 如果是用户拒绝，直接抛出
+      if (reqError.code === 4001) {
+        throw new Error('用户拒绝了连接钱包请求');
+      }
+      
+      // 如果是 evmAsk.js 错误，尝试其他方法
+      if (reqError.code === -32603 || 
+          reqError.message?.includes('Unexpected error') || 
+          reqError.message?.includes('evmAsk') || 
+          reqError.message?.includes('selectExtension')) {
+        console.warn('方法1失败（evmAsk.js错误），尝试方法2...', reqError);
+        
+        // 方法2：在 HTTPS 环境下，尝试使用 wallet_requestPermissions
+        if (isHTTPS) {
+          try {
+            console.log('尝试方法2: wallet_requestPermissions');
+            await ethereum.request({
+              method: 'wallet_requestPermissions',
+              params: [{ eth_accounts: {} }],
+            });
+            
+            // 权限请求成功后，获取账户
+            const accounts = await ethereum.request({
+              method: 'eth_accounts',
+            });
+            
+            if (accounts && accounts.length > 0) {
+              console.log('✅ 通过 wallet_requestPermissions 成功获取账户:', accounts);
+              return accounts;
+            }
+          } catch (permError: any) {
+            console.warn('方法2也失败，尝试方法3...', permError);
+            
+            // 方法3：等待后重试 eth_accounts（可能连接已在后台建立）
+            console.log('尝试方法3: 等待后重试 eth_accounts');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            try {
+              const accounts = await ethereum.request({
+                method: 'eth_accounts',
+              });
+              
+              if (accounts && accounts.length > 0) {
+                console.log('✅ 通过重试 eth_accounts 成功获取账户:', accounts);
+                return accounts;
+              }
+            } catch (retryError) {
+              console.warn('方法3也失败:', retryError);
+            }
+          }
+        }
+        
+        // 所有方法都失败，抛出友好的错误信息
+        throw new Error('钱包连接失败。这可能是由于多个钱包扩展冲突导致的。请尝试：1) 刷新页面 2) 暂时禁用其他钱包扩展 3) 确保 MetaMask 已解锁');
+      }
+      
+      // 其他错误直接抛出
+      throw reqError;
     }
     
     throw new Error('未获取到账户');
@@ -105,37 +163,6 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
     // 处理用户拒绝
     if (error.code === 4001) {
       throw new Error('用户拒绝了连接钱包请求');
-    }
-    
-    // 处理 evmAsk.js 错误（-32603 或其他内部错误）
-    if (error.code === -32603 || 
-        error.message?.includes('Unexpected error') || 
-        error.message?.includes('evmAsk') || 
-        error.message?.includes('selectExtension')) {
-      console.error('钱包连接错误（evmAsk.js）:', error);
-      
-      // 在 HTTPS 环境下，等待后重试 eth_accounts（可能连接已在后台建立）
-      if (isHTTPS) {
-        console.log('HTTPS 环境，等待后重试 eth_accounts...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        try {
-          const accounts = await ethereum.request({
-            method: 'eth_accounts',
-          });
-          if (accounts && accounts.length > 0) {
-            console.log('通过重试 eth_accounts 获取到账户:', accounts);
-            return accounts;
-          }
-        } catch (retryError) {
-          console.warn('重试 eth_accounts 也失败:', retryError);
-        }
-      }
-      
-      // 提供详细的错误信息和解决建议
-      const errorMsg = isHTTPS
-        ? '钱包连接失败（HTTPS 环境）。请尝试：1) 在 MetaMask 扩展中手动连接此网站 2) 刷新页面 3) 禁用其他钱包扩展 4) 确保 MetaMask 已解锁'
-        : '钱包连接失败。请尝试：1) 刷新页面 2) 确保只启用 MetaMask 扩展 3) 在 MetaMask 中手动连接此网站';
-      throw new Error(errorMsg);
     }
     
     // 其他错误直接抛出
@@ -151,6 +178,55 @@ export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [x402ResponseData, setX402ResponseData] = useState<any>(null); // 存储 402 响应的完整数据
+  const [walletConnected, setWalletConnected] = useState(false); // 钱包连接状态
+  const [walletAddress, setWalletAddress] = useState<string | null>(null); // 钱包地址
+
+  // 页面加载时自动检测钱包连接状态（不触发连接请求）
+  useEffect(() => {
+    const checkWalletConnection = async () => {
+      const ethereum = getEthereumProvider();
+      if (!ethereum) {
+        return;
+      }
+
+      try {
+        // 只查询，不请求连接
+        const accounts = await ethereum.request({
+          method: 'eth_accounts',
+        });
+        
+        if (accounts && accounts.length > 0) {
+          setWalletConnected(true);
+          setWalletAddress(accounts[0]);
+          console.log('检测到已连接的钱包:', accounts[0]);
+        }
+      } catch (error) {
+        console.warn('检测钱包连接状态失败:', error);
+      }
+    };
+
+    checkWalletConnection();
+
+    // 监听账户变化
+    const ethereum = getEthereumProvider();
+    if (ethereum) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length > 0) {
+          setWalletConnected(true);
+          setWalletAddress(accounts[0]);
+        } else {
+          setWalletConnected(false);
+          setWalletAddress(null);
+        }
+      };
+
+      ethereum.on('accountsChanged', handleAccountsChanged);
+
+      return () => {
+        ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      };
+    }
+  }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
