@@ -357,12 +357,64 @@ export default function Home() {
     }
   };
 
+  // 连接钱包（独立函数，在支付前调用）
+  const handleConnectWallet = async () => {
+    try {
+      const ethereum = getEthereumProvider();
+      
+      if (!ethereum) {
+        throw new Error('请安装 MetaMask 钱包');
+      }
+
+      // 检测是否有多个钱包扩展
+      const hasMultipleWallets = Array.isArray(window.ethereum) && window.ethereum.length > 1;
+      if (hasMultipleWallets) {
+        console.warn('检测到多个钱包扩展，可能导致连接问题');
+      }
+
+      // 直接调用，不要任何包装或延迟
+      console.log('直接调用 eth_requestAccounts...');
+      const accounts = await ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+
+      if (accounts && accounts.length > 0) {
+        setWalletConnected(true);
+        setWalletAddress(accounts[0]);
+        console.log('✅ 钱包连接成功:', accounts[0]);
+        return accounts[0];
+      }
+
+      throw new Error('未获取到账户');
+    } catch (error: any) {
+      console.error('钱包连接失败:', error);
+      
+      if (error.code === 4001) {
+        throw new Error('用户拒绝了连接钱包请求');
+      }
+      
+      // 检测是否是多个钱包扩展冲突
+      const hasMultipleWallets = Array.isArray(window.ethereum) && window.ethereum.length > 1;
+      if (hasMultipleWallets && (error.code === -32603 || error.message?.includes('evmAsk') || error.message?.includes('selectExtension'))) {
+        throw new Error('检测到多个钱包扩展冲突。请暂时禁用其他钱包扩展，只保留 MetaMask，然后刷新页面重试');
+      }
+      
+      throw new Error(error.message || '钱包连接失败');
+    }
+  };
+
   // 连接钱包并支付（使用 Wei 格式）
   const handlePayment = async () => {
     if (!paymentInfo) return;
 
     setPaymentLoading(true);
     try {
+      // 如果钱包未连接，先连接
+      if (!walletConnected || !walletAddress) {
+        console.log('钱包未连接，先连接钱包...');
+        await handleConnectWallet();
+      }
+
       // 获取正确的 ethereum 提供者
       const ethereum = getEthereumProvider();
       
@@ -370,29 +422,19 @@ export default function Home() {
         throw new Error('请安装 MetaMask 钱包');
       }
 
-      // 请求连接钱包（使用安全方法，避免 evmAsk.js 错误）
+      // 再次确认账户（防止状态不同步）
       let accounts: string[];
       try {
+        accounts = await ethereum.request({
+          method: 'eth_accounts',
+        });
+      } catch (error) {
+        console.warn('获取账户失败，尝试重新连接...', error);
         accounts = await safeRequestAccounts(ethereum);
-      } catch (error: any) {
-        // 处理用户拒绝连接的情况
-        if (error.code === 4001) {
-          throw new Error('用户拒绝了连接钱包请求');
-        }
-        // 处理 JSON-RPC 内部错误或 evmAsk.js 错误
-        if (error.code === -32603 || error.message?.includes('Unexpected error') || error.message?.includes('evmAsk')) {
-          console.error('钱包连接错误（可能是扩展冲突）:', error);
-          // 提供更详细的错误信息
-          throw new Error('钱包连接失败。请尝试：1) 刷新页面 2) 确保只启用 MetaMask 扩展 3) 在 MetaMask 中手动连接此网站');
-        } else {
-          // 处理其他错误
-          console.error('连接钱包失败:', error);
-          throw new Error(error.message || `连接钱包失败: ${error.message || '未知错误'}`);
-        }
       }
 
       if (!accounts || accounts.length === 0) {
-        throw new Error('请连接钱包');
+        throw new Error('请先连接钱包');
       }
 
       const fromAddress = accounts[0];
@@ -786,6 +828,14 @@ export default function Home() {
                       {paymentInfo.address}
                     </span>
                   </div>
+                  {walletAddress && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600 dark:text-zinc-400">支付地址：</span>
+                      <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 break-all">
+                        {walletAddress}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-zinc-600 dark:text-zinc-400">Wei 格式：</span>
                     <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 break-all">
@@ -793,6 +843,27 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
+                
+                {/* 如果钱包未连接，显示连接按钮 */}
+                {!walletConnected && (
+                  <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+                      请先连接钱包
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await handleConnectWallet();
+                        } catch (err: any) {
+                          setError(err.message || '连接钱包失败');
+                        }
+                      }}
+                      className="w-full py-2 px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                    >
+                      连接钱包
+                    </button>
+                  </div>
+                )}
                 {/* 402 响应数据格式显示 */}
                 {x402ResponseData && (
                   <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
