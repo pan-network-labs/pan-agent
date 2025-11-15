@@ -194,26 +194,37 @@ export async function OPTIONS() {
 
 // 从请求头中获取正确的域名（支持 Vercel）
 function getBaseUrl(request: NextRequest): string {
-  // 1. 优先使用 Vercel 环境变量（最可靠）
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+  // 1. 优先使用生产环境 URL（避免预览部署 URL 的身份验证问题）
+  // 检查是否是预览部署 URL（包含随机字符串）
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = request.headers.get('host');
+  
+  // 如果是预览部署 URL（包含随机字符串），使用生产环境 URL
+  const isPreviewDeployment = (forwardedHost || host || '').match(/^[a-z0-9-]+-[a-z0-9]+-[a-z0-9]+\.vercel\.app$/);
+  
+  if (isPreviewDeployment) {
+    console.log('检测到预览部署 URL，使用生产环境 URL');
+    return 'https://pan-agent.vercel.app';
   }
   
   // 2. 使用 x-forwarded-host（Vercel 会设置）
-  const forwardedHost = request.headers.get('x-forwarded-host');
   if (forwardedHost) {
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     return `${protocol}://${forwardedHost}`;
   }
   
   // 3. 使用 host 头
-  const host = request.headers.get('host');
   if (host) {
     const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
     return `${protocol}://${host}`;
   }
   
-  // 4. 从 request.url 中提取（备用）
+  // 4. 使用 Vercel 环境变量（如果可用且不是预览部署）
+  if (process.env.VERCEL_URL && !process.env.VERCEL_URL.match(/^[a-z0-9-]+-[a-z0-9]+-[a-z0-9]+\.vercel\.app$/)) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // 5. 从 request.url 中提取（备用）
   try {
     const url = new URL(request.url);
     // 如果 URL 包含 localhost，说明可能是开发环境，否则使用 URL 的 host
@@ -224,7 +235,7 @@ function getBaseUrl(request: NextRequest): string {
     // 忽略错误
   }
   
-  // 5. 最后的备用方案
+  // 6. 最后的备用方案：使用生产环境 URL
   return 'https://pan-agent.vercel.app';
 }
 
