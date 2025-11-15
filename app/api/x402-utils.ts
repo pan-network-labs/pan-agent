@@ -16,6 +16,8 @@ export interface X402PaymentRequirement {
   mimeType: string; // 资源响应的 MIME 类型
   ext?: { // 扩展字段（可选）
     referrer?: string; // 推广人地址
+    error?: string; // 错误信息（验证失败时）
+    errorDetails?: any; // 错误详情（验证失败时）
   };
 }
 
@@ -37,6 +39,8 @@ export function createX402Response(
     description?: string; // 资源描述（可选）
     mimeType?: string; // MIME 类型（可选，默认 "application/json"）
     referrer?: string; // 推广人地址（可选）
+    error?: string; // 错误信息（验证失败时，可选）
+    errorDetails?: any; // 错误详情（验证失败时，可选）
   }
 ): X402Response {
   // price 已经是 Wei 格式，直接使用
@@ -59,11 +63,18 @@ export function createX402Response(
     mimeType: config.mimeType || 'application/json',
   };
 
-  // 如果有 referrer，添加到 ext 字段
-  if (config.referrer) {
-    acceptsItem.ext = {
-      referrer: config.referrer,
-    };
+  // 构建 ext 字段（如果有 referrer 或 error）
+  if (config.referrer || config.error) {
+    acceptsItem.ext = {};
+    if (config.referrer) {
+      acceptsItem.ext.referrer = config.referrer;
+    }
+    if (config.error) {
+      acceptsItem.ext.error = config.error;
+      if (config.errorDetails) {
+        acceptsItem.ext.errorDetails = config.errorDetails;
+      }
+    }
   }
 
   return {

@@ -339,7 +339,6 @@ export function getAgentCard(baseUrl: string) {
       "network": PAYMENT_CONFIG.network,
       // Generate Agent 收款地址：0x74cc09316deab81ee874839e1da9e84ec066369c
       "address": PAYMENT_CONFIG.address,
-      "minAmount": PAYMENT_CONFIG.minAmount,
       "pricingModel": "per_call",
       "note": "每个能力的具体价格请查看 capabilities[].pricing 字段"
     },

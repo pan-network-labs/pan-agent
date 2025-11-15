@@ -82,30 +82,45 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
 
   try {
     // 2. Base64 解码获取交易哈希
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 Generate Agent 开始验证支付');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📋 接收到的 X-PAYMENT 头:', xPaymentHeader);
+    
     const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
+    console.log('📝 Base64 解码后的交易哈希:', tsHash);
     
     // 3. 连接 BSC Testnet
+    console.log('🌐 连接 RPC 节点:', PAYMENT_CONFIG.rpcUrl);
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     
     // 4. 查询交易信息
+    console.log('🔎 查询交易信息...');
     const tx = await provider.getTransaction(tsHash);
     if (!tx) {
+      console.error('❌ 交易不存在:', tsHash);
       return { valid: false, error: '交易不存在' };
     }
 
     // 5. 等待交易确认并获取收据
+    console.log('⏳ 等待交易确认...');
     const receipt = await provider.getTransactionReceipt(tsHash);
     if (!receipt) {
+      console.error('❌ 交易尚未确认:', tsHash);
       return { valid: false, error: '交易尚未确认' };
     }
 
     // 6. 打印交易信息
-    console.log('交易信息:');
-    console.log('交易哈希:', tsHash);
-    console.log('发送方:', tx.from);
-    console.log('接收方（合约地址）:', tx.to);
-    console.log('交易金额:', ethers.formatEther(tx.value), 'BNB');
-    console.log('交易状态:', receipt.status === 1 ? '成功' : '失败');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📊 交易信息:');
+    console.log('  - 交易哈希:', tsHash);
+    console.log('  - 发送方:', tx.from);
+    console.log('  - 接收方（合约地址）:', tx.to);
+    console.log('  - 交易金额 (Wei):', tx.value.toString());
+    console.log('  - 交易金额 (BNB):', ethers.formatEther(tx.value));
+    console.log('  - 交易状态:', receipt.status === 1 ? '✅ 成功' : '❌ 失败');
+    console.log('  - 区块号:', receipt.blockNumber?.toString() || 'N/A');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     // 7. 验证收款地址和金额（使用 Wei 格式比较）
     const expectedAddress = PAYMENT_CONFIG.address.toLowerCase();
@@ -118,27 +133,53 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     const toAddress = tx.to?.toLowerCase();
     const isValidRecipient = toAddress === expectedAddress;
     
-    console.log(`验证 to 地址: 期望 ${expectedAddress}, 实际 ${toAddress}`);
+    console.log('🔐 验证收款地址:');
+    console.log('  - 期望地址:', expectedAddress);
+    console.log('  - 实际地址:', toAddress);
+    console.log('  - 匹配结果:', isValidRecipient ? '✅ 匹配' : '❌ 不匹配');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('💰 验证支付金额:');
+    console.log('  - 期望最小金额 (Wei):', PAYMENT_CONFIG.minAmount);
+    console.log('  - 期望最小金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
+    console.log('  - 实际支付金额 (Wei):', amountWei.toString());
+    console.log('  - 实际支付金额 (BNB):', ethers.formatEther(amountWei.toString()));
+    console.log('  - 金额是否足够:', amountWei >= minAmountWei ? '✅ 足够' : '❌ 不足');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     if (!isValidRecipient) {
-      console.log('收款地址不匹配');
-      return { valid: false, error: '收款地址不匹配' };
+      console.error('❌ 收款地址不匹配');
+      console.error('  期望:', expectedAddress);
+      console.error('  实际:', toAddress);
+      return { valid: false, error: `收款地址不匹配（期望: ${expectedAddress}, 实际: ${toAddress}）` };
     }
 
     if (amountWei < minAmountWei) {
-      console.log(`交易金额不足: 期望 >= ${ethers.formatEther(PAYMENT_CONFIG.minAmount)} BNB, 实际 ${ethers.formatEther(tx.value.toString())} BNB`);
-      return { valid: false, error: '交易金额不足' };
+      console.error('❌ 交易金额不足');
+      console.error('  期望 >=', ethers.formatEther(PAYMENT_CONFIG.minAmount), 'BNB');
+      console.error('  实际:', ethers.formatEther(tx.value.toString()), 'BNB');
+      return { valid: false, error: `交易金额不足（期望 >= ${ethers.formatEther(PAYMENT_CONFIG.minAmount)} BNB, 实际 ${ethers.formatEther(tx.value.toString())} BNB）` };
     }
 
     // 9. 验证交易是否成功
     if (receipt.status !== 1) {
+      console.error('❌ 交易失败（状态码:', receipt.status, ')');
       return { valid: false, error: '交易失败' };
     }
 
     // 10. 返回用户地址（用于后续给用户发放 SBT）
+    console.log('✅ 支付验证成功');
+    console.log('  - 用户地址:', tx.from);
+    console.log('═══════════════════════════════════════════════════════════');
     return { valid: true, userAddress: tx.from };
   } catch (error) {
-    console.error('支付验证错误:', error);
+    console.error('═══════════════════════════════════════════════════════════');
+    console.error('❌ 支付验证错误:');
+    console.error('  错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('  错误消息:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+      console.error('  错误堆栈:', error.stack);
+    }
+    console.error('═══════════════════════════════════════════════════════════');
     return {
       valid: false,
       error: error instanceof Error ? error.message : '支付验证失败',
@@ -204,15 +245,38 @@ export async function POST(request: NextRequest) {
     
     if (!paymentValidation.valid) {
       // 验证失败时返回 402 和支付信息（x402 标准格式）
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('❌ Generate Agent 支付验证失败，返回 402 响应');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📋 验证失败原因:', paymentValidation.error);
+      console.log('📋 验证错误详情:', JSON.stringify(paymentValidation.error, null, 2));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('💰 期望的支付信息:');
+      console.log('  - 合约地址:', PAYMENT_CONFIG.address);
+      console.log('  - 支付金额 (Wei):', PAYMENT_CONFIG.price);
+      console.log('  - 支付金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.price));
+      console.log('  - 最小金额 (Wei):', PAYMENT_CONFIG.minAmount);
+      console.log('  - 最小金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
+      console.log('  - 货币:', PAYMENT_CONFIG.currency);
+      console.log('  - 网络:', PAYMENT_CONFIG.network);
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      // 构建错误信息
+      const errorMessage = typeof paymentValidation.error === 'string' 
+        ? paymentValidation.error 
+        : JSON.stringify(paymentValidation.error);
+      
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
         network: PAYMENT_CONFIG.network,
         address: PAYMENT_CONFIG.address,
         resource: resource,
-        description: 'Payment validation failed, please retry',
+        description: `Payment validation failed: ${errorMessage}`,
         mimeType: 'application/json',
         referrer: referrer, // 如果有 referrer，包含在响应中
+        error: errorMessage, // 错误信息
+        errorDetails: paymentValidation.error, // 错误详情
       });
       
       return NextResponse.json(

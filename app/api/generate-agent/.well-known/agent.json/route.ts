@@ -63,7 +63,7 @@ function getAgentCard(baseUrl: string) {
         "name": "generate_image",
         "description": "根据主题自动生成提示词并生成1024x1024的抽象油画风格图片（会自动调用 Prompt Agent）",
         "pricing": {
-          "price": PAYMENT_CONFIG.price,
+          "price": ethers.formatEther(PAYMENT_CONFIG.price), // 转换为 BNB 格式显示
           "currency": PAYMENT_CONFIG.currency,
           "network": PAYMENT_CONFIG.network,
           "address": PAYMENT_CONFIG.address,
