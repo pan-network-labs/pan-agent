@@ -1,0 +1,64 @@
+{
+  "common": {
+    "appName": "Pan Agent",
+    "loading": "載入中...",
+    "error": "錯誤",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "確認",
+    "close": "關閉",
+    "retry": "重試"
+  },
+  "home": {
+    "title": "智譜AI 圖片生成測試",
+    "subtitle": "CogView-3-Flash 模型",
+    "description": "點擊按鈕即可生成圖片，系統會自動調用 Prompt Agent 生成優化的提示詞",
+    "generateButton": "生成圖片",
+    "generating": "生成中...",
+    "generateError": "生成圖片時發生錯誤",
+    "generatedImage": "生成的圖片",
+    "viewOriginal": "查看原圖",
+    "downloadImage": "下載圖片"
+  },
+  "wallet": {
+    "connect": "連接錢包",
+    "connecting": "連接中...",
+    "connected": "已連接",
+    "notInstalled": "請安裝 MetaMask 錢包",
+    "connectFailed": "錢包連接失敗",
+    "connectFailedDetails": "請嘗試：1) 刷新頁面 2) 確保只啟用 MetaMask 擴展 3) 在 MetaMask 中手動連接此網站",
+    "userRejected": "用戶拒絕了連接錢包請求",
+    "multipleWallets": "檢測到多個錢包擴展衝突。請暫時禁用其他錢包擴展，只保留 MetaMask，然後刷新頁面重試",
+    "address": "支付地址",
+    "pleaseConnect": "請先連接錢包"
+  },
+  "payment": {
+    "required": "需要支付",
+    "amount": "金額",
+    "network": "網絡",
+    "recipient": "收款地址",
+    "weiFormat": "Wei 格式",
+    "connectAndPay": "連接錢包並支付",
+    "paying": "支付中...",
+    "confirmPayment": "確認支付",
+    "pleaseConnectFirst": "請先連接錢包",
+    "paymentFailed": "支付失敗",
+    "paymentSuccess": "支付成功",
+    "transactionHash": "交易哈希",
+    "validationFailed": "支付驗證失敗，請重試",
+    "validationFailedDetails": "支付驗證失敗",
+    "addressMismatch": "收款地址不匹配",
+    "insufficientAmount": "交易金額不足",
+    "transactionFailed": "交易失敗",
+    "transactionNotConfirmed": "交易尚未確認",
+    "transactionNotFound": "交易不存在"
+  },
+  "errors": {
+    "unknown": "未知錯誤",
+    "networkError": "網絡錯誤",
+    "userRejected": "用戶拒絕了請求",
+    "insufficientFunds": "餘額不足",
+    "transactionRejected": "用戶拒絕了交易請求"
+  }
+}
+

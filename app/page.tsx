@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ethers } from 'ethers';
+import { getLocale, setLocale, useTranslations, type Locale, locales, localeNames } from '../lib/i18n';
+import LocaleSwitcher from '../components/LocaleSwitcher';
 
 interface PaymentInfo {
   address: string;
@@ -171,6 +173,15 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
 }
 
 export default function Home() {
+  // 多语言支持
+  const [currentLocale, setCurrentLocale] = useState<Locale>(() => {
+    if (typeof window !== 'undefined') {
+      return getLocale();
+    }
+    return 'en';
+  });
+  const { t, loading: i18nLoading } = useTranslations(currentLocale);
+  
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +191,12 @@ export default function Home() {
   const [x402ResponseData, setX402ResponseData] = useState<any>(null); // 存储 402 响应的完整数据
   const [walletConnected, setWalletConnected] = useState(false); // 钱包连接状态
   const [walletAddress, setWalletAddress] = useState<string | null>(null); // 钱包地址
+
+  // 切换语言
+  const handleLocaleChange = (locale: Locale) => {
+    setLocale(locale);
+    setCurrentLocale(locale);
+  };
 
   // 页面加载时自动检测钱包连接状态（不触发连接请求）
   useEffect(() => {
@@ -753,7 +770,7 @@ export default function Home() {
           {/* 生成按钮区域 */}
           <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6">
             <p className="text-center text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-              点击按钮即可生成图片，系统会自动调用 Prompt Agent 生成优化的提示词
+              {t('home.description')}
             </p>
             
             <button
@@ -787,10 +804,10 @@ export default function Home() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <span>生成中...</span>
+                  <span>{t('home.generating')}</span>
                 </>
               ) : (
-                <span>生成图片</span>
+                <span>{t('home.generateButton')}</span>
               )}
             </button>
 
@@ -807,37 +824,37 @@ export default function Home() {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
                 <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                  需要支付
+                  {t('payment.required')}
                 </h2>
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-zinc-600 dark:text-zinc-400">金额：</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">{t('payment.amount')}：</span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">
                       {weiToBNB(paymentInfo.amountWei)} {paymentInfo.currency}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-600 dark:text-zinc-400">网络：</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">{t('payment.network')}：</span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">
                       {paymentInfo.chain}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-600 dark:text-zinc-400">收款地址：</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">{t('payment.recipient')}：</span>
                     <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 break-all">
                       {paymentInfo.address}
                     </span>
                   </div>
                   {walletAddress && (
                     <div className="flex justify-between">
-                      <span className="text-zinc-600 dark:text-zinc-400">支付地址：</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">{t('wallet.address')}：</span>
                       <span className="font-mono text-sm text-zinc-900 dark:text-zinc-100 break-all">
                         {walletAddress}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-zinc-600 dark:text-zinc-400">Wei 格式：</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">{t('payment.weiFormat')}：</span>
                     <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 break-all">
                       {paymentInfo.amountWei}
                     </span>
@@ -848,19 +865,19 @@ export default function Home() {
                 {!walletConnected && (
                   <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-                      请先连接钱包
+                      {t('wallet.pleaseConnect')}
                     </p>
                     <button
                       onClick={async () => {
                         try {
                           await handleConnectWallet();
                         } catch (err: any) {
-                          setError(err.message || '连接钱包失败');
+                          setError(err.message || t('wallet.connectFailed'));
                         }
                       }}
                       className="w-full py-2 px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
                     >
-                      连接钱包
+                      {t('wallet.connect')}
                     </button>
                   </div>
                 )}
@@ -892,11 +909,11 @@ export default function Home() {
                     className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg transition-colors"
                     disabled={paymentLoading}
                   >
-                    取消
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={handlePayment}
-                    disabled={paymentLoading}
+                    disabled={paymentLoading || !walletConnected}
                     className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     {paymentLoading ? (
@@ -921,10 +938,10 @@ export default function Home() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        <span>支付中...</span>
+                        <span>{t('payment.paying')}</span>
                       </>
                     ) : (
-                      <span>连接钱包并支付</span>
+                      <span>{t('payment.connectAndPay')}</span>
                     )}
                   </button>
                 </div>
@@ -941,7 +958,7 @@ export default function Home() {
               <div className="relative w-full aspect-square bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
                 <Image
                   src={imageUrl}
-                  alt="生成的图片"
+                  alt={t('home.title')}
                   fill
                   className="object-contain"
                   unoptimized

@@ -1,0 +1,64 @@
+{
+  "common": {
+    "appName": "Pan Agent",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "retry": "Retry"
+  },
+  "home": {
+    "title": "ZhipuAI Image Generation Test",
+    "subtitle": "CogView-3-Flash Model",
+    "description": "Click the button to generate an image. The system will automatically call Prompt Agent to generate optimized prompts",
+    "generateButton": "Generate Image",
+    "generating": "Generating...",
+    "generateError": "Error generating image",
+    "generatedImage": "Generated Image",
+    "viewOriginal": "View Original",
+    "downloadImage": "Download Image"
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "notInstalled": "Please install MetaMask wallet",
+    "connectFailed": "Failed to connect wallet",
+    "connectFailedDetails": "Please try: 1) Refresh the page 2) Make sure only MetaMask extension is enabled 3) Manually connect this website in MetaMask",
+    "userRejected": "User rejected the wallet connection request",
+    "multipleWallets": "Multiple wallet extensions detected. Please temporarily disable other wallet extensions, keep only MetaMask, then refresh the page and try again",
+    "address": "Payment Address",
+    "pleaseConnect": "Please connect wallet first"
+  },
+  "payment": {
+    "required": "Payment Required",
+    "amount": "Amount",
+    "network": "Network",
+    "recipient": "Recipient Address",
+    "weiFormat": "Wei Format",
+    "connectAndPay": "Connect Wallet and Pay",
+    "paying": "Paying...",
+    "confirmPayment": "Confirm Payment",
+    "pleaseConnectFirst": "Please connect wallet first",
+    "paymentFailed": "Payment failed",
+    "paymentSuccess": "Payment successful",
+    "transactionHash": "Transaction Hash",
+    "validationFailed": "Payment validation failed, please retry",
+    "validationFailedDetails": "Payment validation failed",
+    "addressMismatch": "Recipient address mismatch",
+    "insufficientAmount": "Insufficient transaction amount",
+    "transactionFailed": "Transaction failed",
+    "transactionNotConfirmed": "Transaction not confirmed",
+    "transactionNotFound": "Transaction not found"
+  },
+  "errors": {
+    "unknown": "Unknown error",
+    "networkError": "Network error",
+    "userRejected": "User rejected the request",
+    "insufficientFunds": "Insufficient funds",
+    "transactionRejected": "User rejected the transaction request"
+  }
+}
+
