@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
         },
       },
       {
-        headers: getCorsHeaders(origin),
+        headers: getCorsHeaders(),
       }
     );
   } catch (error) {
