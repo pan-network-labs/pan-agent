@@ -192,6 +192,15 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
+// 从请求头中获取正确的域名（支持 Vercel）
+function getBaseUrl(request: NextRequest): string {
+  // 优先使用 x-forwarded-host（Vercel 会设置）
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
+  // 优先使用 x-forwarded-proto（Vercel 会设置），否则根据 host 判断
+  const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+  return `${protocol}://${host}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. 支付验证（在函数最开始）
@@ -294,15 +303,18 @@ export async function POST(request: NextRequest) {
     let finalPrompt: string;
     try {
       // 获取 Prompt Agent URL（优先使用环境变量，否则使用当前请求的域名自动构建）
-      // 注意：requestUrl 已经在函数开头定义过了，这里直接使用
-      const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+      // 使用 getBaseUrl 函数获取正确的域名（支持 Vercel）
+      const baseUrl = getBaseUrl(request);
       const agentUrl = process.env.PROMPT_AGENT_URL || `${baseUrl}/api/prompt-agent`;
       
       console.log('═══════════════════════════════════════════════════════════');
       console.log('🔗 Generate Agent 准备调用 Prompt Agent');
       console.log('═══════════════════════════════════════════════════════════');
       console.log('当前请求 URL:', requestUrl.toString());
-      console.log('Base URL:', baseUrl);
+      console.log('请求头 x-forwarded-host:', request.headers.get('x-forwarded-host') || '(未设置)');
+      console.log('请求头 host:', request.headers.get('host') || '(未设置)');
+      console.log('请求头 x-forwarded-proto:', request.headers.get('x-forwarded-proto') || '(未设置)');
+      console.log('Base URL (计算后):', baseUrl);
       console.log('PROMPT_AGENT_URL 环境变量:', process.env.PROMPT_AGENT_URL || '(未设置)');
       console.log('最终使用的 Prompt Agent URL:', agentUrl);
       console.log('═══════════════════════════════════════════════════════════');
