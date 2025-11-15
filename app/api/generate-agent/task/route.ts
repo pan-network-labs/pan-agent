@@ -327,7 +327,13 @@ export async function POST(request: NextRequest) {
             {
               code: 500,
               msg: '调用 Prompt Agent 失败: 内部支付处理异常，请稍后重试',
-              data: null,
+              data: {
+                error: {
+                  type: 'Prompt Agent 402 Error',
+                  message: 'Generate Agent 向 Prompt Agent 支付验证失败（内部支付问题）',
+                  details: promptResult.error?.data || promptResult.error,
+                },
+              },
             },
             {
               status: 500,
@@ -342,7 +348,12 @@ export async function POST(request: NextRequest) {
           {
             code: 500,
             msg: `调用 Prompt Agent 失败: ${errorMessage}`,
-            data: null,
+            data: {
+              error: promptResult.error || {
+                message: errorMessage,
+                details: promptResult,
+              },
+            },
           },
           {
             status: 500,
@@ -354,12 +365,34 @@ export async function POST(request: NextRequest) {
       finalPrompt = promptResult.prompt;
       console.log('从 Prompt Agent 获取的 prompt:', finalPrompt);
     } catch (error) {
-      console.error('调用 Prompt Agent 时发生错误:', error);
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ Generate Agent 调用 Prompt Agent 时发生异常错误:');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('错误消息:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        console.error('错误堆栈:', error.stack);
+      }
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      // 构建详细的错误信息（返回给客户端）
+      const errorDetails = error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        type: error.constructor.name,
+      } : {
+        type: typeof error,
+        value: String(error),
+      };
+      
       return NextResponse.json(
         {
           code: 500,
           msg: `调用 Prompt Agent 失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          data: null,
+          data: {
+            error: errorDetails,
+          },
         },
         {
           status: 500,

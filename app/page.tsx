@@ -700,7 +700,9 @@ export default function Home() {
       // 如果仍然返回 402，说明支付验证失败
       if (response.status === 402) {
         const data = await response.json();
-        throw new Error(data.error || '支付验证失败，请重试');
+        const errorMsg = data.error || data.accepts?.[0]?.ext?.error || '支付验证失败，请重试';
+        const errorDetails = data.accepts?.[0]?.ext?.errorDetails || data.accepts?.[0]?.ext || null;
+        throw new Error(`${errorMsg}${errorDetails ? '\n错误详情: ' + JSON.stringify(errorDetails, null, 2) : ''}`);
       }
 
       const data = await response.json();
@@ -709,7 +711,17 @@ export default function Home() {
       if (data.code === 200 && data.data?.data) {
         setImageUrl(data.data.data);
       } else {
-        throw new Error(data.msg || '生成图片失败');
+        // 如果 data.data 包含错误信息，显示详细错误
+        const errorInfo = data.data?.error || null;
+        const errorMsg = data.msg || '生成图片失败';
+        if (errorInfo) {
+          const errorDetails = typeof errorInfo === 'object' 
+            ? JSON.stringify(errorInfo, null, 2)
+            : String(errorInfo);
+          throw new Error(`${errorMsg}\n\n错误详情:\n${errorDetails}`);
+        } else {
+          throw new Error(errorMsg);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成图片时发生错误');
