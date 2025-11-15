@@ -40,7 +40,32 @@ export async function callA2AAgent(
       body: JSON.stringify(params || {}),
     });
 
-    const result = await response.json();
+    // 检查响应状态和 Content-Type
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    
+    let result: any;
+    try {
+      if (isJson) {
+        result = await response.json();
+      } else {
+        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        const text = await response.text();
+        console.error('A2A Agent 返回了非 JSON 响应:');
+        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        
+        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        try {
+          result = JSON.parse(text);
+        } catch (parseError) {
+          // 确实是 HTML 或其他非 JSON 格式
+          throw new Error(`A2A Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+        }
+      }
+    } catch (parseError) {
+      console.error('解析 A2A Agent 响应失败:', parseError);
+      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+    }
 
     // 处理 402 状态码（需要支付）
     if (response.status === 402) {
@@ -237,9 +262,49 @@ export async function callPromptAgentWithPayment(
       throw new Error(`无法连接到 Prompt Agent (${requestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
     }
 
-    const result = await response.json();
+    // 检查响应状态和 Content-Type
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
     
     console.log('Prompt Agent 响应状态:', response.status);
+    console.log('Prompt Agent 响应 Content-Type:', contentType);
+    console.log('是否为 JSON:', isJson);
+    
+    let result: any;
+    try {
+      if (isJson) {
+        result = await response.json();
+      } else {
+        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        const text = await response.text();
+        console.error('Prompt Agent 返回了非 JSON 响应:');
+        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        
+        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        try {
+          result = JSON.parse(text);
+        } catch (parseError) {
+          // 确实是 HTML 或其他非 JSON 格式
+          throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+        }
+      }
+    } catch (parseError) {
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ 解析 Prompt Agent 响应失败:');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('请求 URL:', requestUrl);
+      console.error('响应状态:', response.status);
+      console.error('响应 Content-Type:', contentType);
+      console.error('错误类型:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
+      console.error('错误消息:', parseError instanceof Error ? parseError.message : String(parseError));
+      if (parseError instanceof Error && parseError.stack) {
+        console.error('错误堆栈:', parseError.stack);
+      }
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+    }
+    
     console.log('Prompt Agent 响应数据:', JSON.stringify(result, null, 2));
 
     // 2. 如果成功，直接返回
@@ -420,9 +485,49 @@ export async function callPromptAgentWithPayment(
         throw new Error(`无法连接到 Prompt Agent (${secondRequestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
       }
 
-      const secondResult = await secondResponse.json();
+      // 检查响应状态和 Content-Type
+      const secondContentType = secondResponse.headers.get('content-type') || '';
+      const secondIsJson = secondContentType.includes('application/json');
       
       console.log('Prompt Agent 第二次调用响应状态:', secondResponse.status);
+      console.log('Prompt Agent 第二次调用响应 Content-Type:', secondContentType);
+      console.log('是否为 JSON:', secondIsJson);
+      
+      let secondResult: any;
+      try {
+        if (secondIsJson) {
+          secondResult = await secondResponse.json();
+        } else {
+          // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+          const text = await secondResponse.text();
+          console.error('Prompt Agent 第二次调用返回了非 JSON 响应:');
+          console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+          
+          // 尝试解析为 JSON（可能 Content-Type 设置错误）
+          try {
+            secondResult = JSON.parse(text);
+          } catch (parseError) {
+            // 确实是 HTML 或其他非 JSON 格式
+            throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${secondResponse.status}，Content-Type: ${secondContentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+          }
+        }
+      } catch (parseError) {
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('❌ 解析 Prompt Agent 第二次调用响应失败:');
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('请求 URL:', secondRequestUrl);
+        console.error('响应状态:', secondResponse.status);
+        console.error('响应 Content-Type:', secondContentType);
+        console.error('错误类型:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
+        console.error('错误消息:', parseError instanceof Error ? parseError.message : String(parseError));
+        if (parseError instanceof Error && parseError.stack) {
+          console.error('错误堆栈:', parseError.stack);
+        }
+        console.error('═══════════════════════════════════════════════════════════');
+        
+        throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+      }
+      
       console.log('Prompt Agent 第二次调用响应数据:', JSON.stringify(secondResult, null, 2));
 
       if (!secondResponse.ok || !secondResult.success) {
@@ -589,7 +694,32 @@ export async function callPromptAgent(
       }),
     });
 
-    const result = await response.json();
+    // 检查响应状态和 Content-Type
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    
+    let result: any;
+    try {
+      if (isJson) {
+        result = await response.json();
+      } else {
+        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        const text = await response.text();
+        console.error('Prompt Agent 返回了非 JSON 响应:');
+        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        
+        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        try {
+          result = JSON.parse(text);
+        } catch (parseError) {
+          // 确实是 HTML 或其他非 JSON 格式
+          throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+        }
+      }
+    } catch (parseError) {
+      console.error('解析 Prompt Agent 响应失败:', parseError);
+      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+    }
 
     if (!response.ok || !result.success) {
       return {
