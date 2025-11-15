@@ -153,10 +153,83 @@ export async function makeContractPayment(
     console.log('  - Description:', description || '(空字符串)');
     console.log('  - Referrer:', referrerString || '(空字符串)');
     console.log('═══════════════════════════════════════════════════════════');
+    console.log('⏳ 等待交易确认...');
 
-    // 4. 等待交易确认（可选）
-    // const receipt = await tx.wait();
-    // console.log('交易已确认:', receipt);
+    // 6. 等待交易确认（必须等待，确保交易成功）
+    let receipt;
+    try {
+      receipt = await tx.wait();
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('✅ 交易已确认');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📋 交易收据信息:');
+      console.log('  - 交易哈希:', receipt.hash);
+      console.log('  - 区块号:', receipt.blockNumber?.toString() || 'N/A');
+      console.log('  - Gas 使用:', receipt.gasUsed?.toString() || 'N/A');
+      console.log('  - 交易状态:', receipt.status === 1 ? '✅ 成功' : '❌ 失败');
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      // 检查交易状态
+      if (receipt.status !== 1) {
+        console.error('❌ 交易失败（状态码:', receipt.status, ')');
+        console.error('交易可能被回退，合约不会有记录');
+        return {
+          success: false,
+          error: `交易失败（状态码: ${receipt.status}）。交易可能被回退，请检查合约日志或交易详情。`,
+        };
+      }
+      
+      // 解析合约事件（PaymentReceived, SBTMinted）
+      const contractInterface = new ethers.Interface([
+        'event PaymentReceived(uint256 indexed tokenId, address indexed payer, address indexed recipient, uint256 amount, uint256 timestamp)',
+        'event SBTMinted(uint256 indexed tokenId, address indexed owner, address indexed recipient, uint256 amount, uint8 rarity)',
+      ]);
+      
+      console.log('📊 解析合约事件...');
+      for (const log of receipt.logs) {
+        try {
+          const parsedLog = contractInterface.parseLog(log);
+          if (parsedLog) {
+            console.log('  - 事件名称:', parsedLog.name);
+            if (parsedLog.name === 'PaymentReceived') {
+              console.log('    - Token ID:', parsedLog.args.tokenId?.toString());
+              console.log('    - Payer:', parsedLog.args.payer);
+              console.log('    - Recipient:', parsedLog.args.recipient);
+              console.log('    - Amount:', parsedLog.args.amount?.toString());
+            } else if (parsedLog.name === 'SBTMinted') {
+              console.log('    - Token ID:', parsedLog.args.tokenId?.toString());
+              console.log('    - Owner:', parsedLog.args.owner);
+              console.log('    - Recipient:', parsedLog.args.recipient);
+              console.log('    - Amount:', parsedLog.args.amount?.toString());
+              console.log('    - Rarity:', parsedLog.args.rarity?.toString());
+            }
+          }
+        } catch (e) {
+          // 忽略无法解析的日志（可能是其他合约的事件）
+        }
+      }
+      
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('✅ 合约调用成功，SBT 已发放');
+      console.log('═══════════════════════════════════════════════════════════');
+    } catch (waitError: any) {
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ 等待交易确认时发生错误:');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('错误类型:', waitError instanceof Error ? waitError.constructor.name : typeof waitError);
+      console.error('错误消息:', waitError instanceof Error ? waitError.message : String(waitError));
+      if (waitError instanceof Error && waitError.stack) {
+        console.error('错误堆栈:', waitError.stack);
+      }
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      // 即使等待失败，也返回交易哈希（交易可能已经发送）
+      return {
+        success: false,
+        error: `交易已发送但确认失败: ${waitError instanceof Error ? waitError.message : '未知错误'}`,
+        txHash: tx.hash, // 仍然返回交易哈希，用户可以手动检查
+      };
+    }
 
     return {
       success: true,

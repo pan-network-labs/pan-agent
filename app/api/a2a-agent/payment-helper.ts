@@ -69,7 +69,20 @@ export async function preparePaymentForAgent(
     );
 
     if (!paymentResult.success || !paymentResult.txHash) {
-      return { xPayment: null, error: paymentResult.error || '支付失败' };
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ 为 Agent 准备支付时失败:');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('Agent URL:', agentUrl);
+      console.error('能力名称:', capabilityName);
+      console.error('用户地址:', userAddress);
+      console.error('错误信息:', paymentResult.error || '支付失败');
+      console.error('完整结果:', JSON.stringify(paymentResult, null, 2));
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      return { 
+        xPayment: null, 
+        error: paymentResult.error || '合约支付失败',
+      };
     }
 
     // 6. 将交易哈希编码为 Base64（用于 X-PAYMENT 头）

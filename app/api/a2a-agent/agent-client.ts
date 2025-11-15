@@ -405,11 +405,23 @@ export async function callPromptAgentWithPayment(
       console.log('合约支付结果:', paymentResult);
 
       if (!paymentResult.success || !paymentResult.txHash) {
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('❌ 合约支付失败:');
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('错误信息:', paymentResult.error || '支付失败');
+        console.error('完整结果:', JSON.stringify(paymentResult, null, 2));
+        console.error('═══════════════════════════════════════════════════════════');
+        
         return {
           success: false,
           error: {
-            message: paymentResult.error || '支付失败',
+            message: paymentResult.error || '合约支付失败',
             data: paymentResult,
+            type: 'Contract Payment Error',
+            details: {
+              error: paymentResult.error,
+              txHash: paymentResult.txHash || null,
+            },
           },
         };
       }

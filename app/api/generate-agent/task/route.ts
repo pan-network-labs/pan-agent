@@ -407,16 +407,24 @@ export async function POST(request: NextRequest) {
           );
         }
         
+        // 提取错误信息（包括合约支付错误）
         const errorMessage = promptResult.error?.message || promptResult.error || '调用 Prompt Agent 失败';
+        const errorType = promptResult.error?.type || 'Unknown Error';
+        const errorDetails = promptResult.error?.details || promptResult.error?.data || promptResult;
+        
         console.error('调用 Prompt Agent 失败:', errorMessage);
+        console.error('错误类型:', errorType);
+        console.error('错误详情:', JSON.stringify(errorDetails, null, 2));
+        
         return NextResponse.json(
           {
             code: 500,
             msg: `调用 Prompt Agent 失败: ${errorMessage}`,
             data: {
-              error: promptResult.error || {
+              error: {
+                type: errorType,
                 message: errorMessage,
-                details: promptResult,
+                details: errorDetails,
               },
             },
           },
