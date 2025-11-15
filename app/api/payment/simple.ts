@@ -184,9 +184,20 @@ export async function makeContractPayment(
     console.log('⏳ 等待交易确认...');
 
     // 6. 等待交易确认（必须等待，确保交易成功）
-    let receipt;
+    let receipt: ethers.TransactionReceipt | null;
     try {
       receipt = await tx.wait();
+      
+      // 检查 receipt 是否为 null
+      if (!receipt) {
+        console.error('❌ 交易确认失败: receipt 为 null');
+        return {
+          success: false,
+          error: '交易已发送但确认失败: receipt 为 null',
+          txHash: tx.hash, // 仍然返回交易哈希，用户可以手动检查
+        };
+      }
+      
       console.log('═══════════════════════════════════════════════════════════');
       console.log('✅ 交易已确认');
       console.log('═══════════════════════════════════════════════════════════');
