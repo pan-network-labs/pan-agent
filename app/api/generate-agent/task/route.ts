@@ -317,6 +317,25 @@ export async function POST(request: NextRequest) {
       );
 
       if (!promptResult.success || !promptResult.prompt) {
+        // 检查是否是 Prompt Agent 返回的 402 错误（这是 Agent 间的支付问题，不应该返回给用户）
+        if (promptResult.error?.status === 402 || (promptResult.error?.data && typeof promptResult.error.data === 'object' && promptResult.error.data.x402Version)) {
+          // 这是 Prompt Agent 的 402 响应，不应该返回给用户
+          // 这是 Generate Agent 内部的支付问题，应该返回 500 错误
+          console.error('调用 Prompt Agent 失败: Prompt Agent 返回 402（这是 Generate Agent 内部的支付问题）');
+          console.error('Prompt Agent 402 响应:', JSON.stringify(promptResult.error?.data || promptResult.error, null, 2));
+          return NextResponse.json(
+            {
+              code: 500,
+              msg: '调用 Prompt Agent 失败: 内部支付处理异常，请稍后重试',
+              data: null,
+            },
+            {
+              status: 500,
+              headers: getCorsHeaders(),
+            }
+          );
+        }
+        
         const errorMessage = promptResult.error?.message || promptResult.error || '调用 Prompt Agent 失败';
         console.error('调用 Prompt Agent 失败:', errorMessage);
         return NextResponse.json(

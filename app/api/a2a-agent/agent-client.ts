@@ -378,9 +378,13 @@ export async function callPromptAgentWithPayment(
         // 提取错误信息
         let errorMessage = '调用 Prompt Agent 失败';
         
-        // 如果是 402 错误，说明支付验证失败
+        // 如果是 402 错误，说明支付验证失败（这是 Generate Agent 内部的支付问题）
         if (secondResponse.status === 402) {
-          errorMessage = '支付验证失败，请检查支付交易是否正确';
+          // Prompt Agent 返回 402，说明 Generate Agent 的支付验证失败
+          // 这是 Agent 间的支付问题，不应该传播给用户
+          errorMessage = 'Generate Agent 向 Prompt Agent 支付验证失败（内部支付问题）';
+          console.error('⚠️ Generate Agent 向 Prompt Agent 支付验证失败:');
+          console.error('Prompt Agent 402 响应:', JSON.stringify(secondResult, null, 2));
         } else if (secondResult.error) {
           if (typeof secondResult.error === 'string') {
             errorMessage = secondResult.error;
@@ -418,11 +422,21 @@ export async function callPromptAgentWithPayment(
           response: secondResult,
         });
         
+        // 如果 Prompt Agent 返回 402，这是 Generate Agent 内部的支付问题
+        // 不应该将 Prompt Agent 的 402 响应传播给用户
+        // 如果 secondResult 是 x402 格式，不应该包含在错误数据中
+        let errorData = secondResult.error || secondResult;
+        if (secondResponse.status === 402 && errorData && typeof errorData === 'object' && errorData.x402Version) {
+          // 这是 x402 格式的响应，不应该传播给用户
+          // 只返回错误消息，不包含 x402 响应数据
+          errorData = { message: 'Prompt Agent 支付验证失败（内部支付问题）' };
+        }
+        
         return {
           success: false,
           error: {
             message: errorMessage,
-            data: secondResult.error || secondResult,
+            data: errorData,
             status: secondResponse.status,
           },
         };
