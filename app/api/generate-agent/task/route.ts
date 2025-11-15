@@ -48,14 +48,31 @@ function getPaymentConfig() {
     ? ethers.parseEther(minAmountEnv).toString() 
     : minAmountEnv;
   
-  // 优先使用 PAYMENT_CONTRACT_ADDRESS（合约地址），如果没有则使用 PAYMENT_ADDRESS
-  const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || process.env.PAYMENT_ADDRESS || '';
+  // ============================================================================
+  // 【重要】Generate Agent 收款地址配置说明：
+  // ============================================================================
+  // PAYMENT_ADDRESS: 普通钱包地址（用户支付给 Generate Agent）
+  //   - 用途：用户直接转账给 Generate Agent 的收款地址（不通过合约）
+  //   - 功能：接收用户支付，Generate Agent 收到后会自动调用 Prompt Agent
+  //   - 说明：用户支付给 Generate Agent 是直接转账，不通过智能合约
+  //   - 示例：0x74cc09316deab81ee874839e1da9e84ec066369c
+  //
+  // 注意：Generate Agent 不使用 PAYMENT_CONTRACT_ADDRESS
+  //      PAYMENT_CONTRACT_ADDRESS 用于 Generate Agent 支付给 Prompt Agent（通过合约）
+  // ============================================================================
+  const paymentAddress = process.env.PAYMENT_ADDRESS || '0x74cc09316deab81ee874839e1da9e84ec066369c';
+  
+  // 记录使用的地址类型（用于调试）
+  console.log(`📋 Generate Agent 收款地址配置: PAYMENT_ADDRESS（普通钱包）`);
+  console.log(`   用途：用户直接转账给 Generate Agent 的收款地址`);
+  console.log(`   地址: ${paymentAddress}`);
+  console.log(`   注意：Generate Agent 支付给 Prompt Agent 使用 PAYMENT_CONTRACT_ADDRESS（智能合约）`);
   
   const config = {
     price: priceWei, // Wei 格式
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
     network: process.env.PAYMENT_NETWORK || 'BSCTest',
-    address: contractAddress, // 使用合约地址
+    address: paymentAddress, // 用户支付给 Generate Agent 的地址（普通钱包）
     minAmount: minAmountWei, // Wei 格式
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };
@@ -127,16 +144,18 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     const amountWei = BigInt(tx.value.toString());
     const minAmountWei = BigInt(PAYMENT_CONFIG.minAmount);
 
-    // 验证交易的 to 地址（支持直接支付和智能合约支付）
-    // 直接支付：to 地址是 PAYMENT_ADDRESS
-    // 智能合约支付：to 地址是合约地址（合约直接收款，不再需要 recipient 参数）
+    // 验证交易的 to 地址
+    // Generate Agent 收款：用户直接转账到 PAYMENT_ADDRESS（普通钱包地址）
+    // 注意：Generate Agent 不使用智能合约收款，用户是直接转账
     const toAddress = tx.to?.toLowerCase();
     const isValidRecipient = toAddress === expectedAddress;
     
-    console.log('🔐 验证收款地址:');
-    console.log('  - 期望地址:', expectedAddress);
-    console.log('  - 实际地址:', toAddress);
+    console.log('🔐 验证收款地址（用户直接转账给 Generate Agent）:');
+    console.log('  - 期望地址（PAYMENT_ADDRESS）:', expectedAddress);
+    console.log('  - 实际交易接收地址:', toAddress);
     console.log('  - 匹配结果:', isValidRecipient ? '✅ 匹配' : '❌ 不匹配');
+    console.log('  - 环境变量 PAYMENT_ADDRESS:', process.env.PAYMENT_ADDRESS || '(未设置，使用默认值)');
+    console.log('  - 说明：用户直接转账给 Generate Agent，不通过智能合约');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('💰 验证支付金额:');
     console.log('  - 期望最小金额 (Wei):', PAYMENT_CONFIG.minAmount);

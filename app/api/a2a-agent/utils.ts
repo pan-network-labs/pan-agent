@@ -29,12 +29,28 @@ export function getPaymentConfig() {
     ? ethers.parseEther(minAmountEnv).toString() 
     : minAmountEnv;
   
+  // ============================================================================
+  // 【重要】A2A Agent 收款地址配置说明：
+  // ============================================================================
+  // PAYMENT_ADDRESS: 普通钱包地址（用于 A2A Agent）
+  //   - 用途：用户支付给 A2A Agent 的收款地址（直接转账，不通过合约）
+  //   - 功能：仅接收转账，不发放 SBT
+  //   - 说明：A2A Agent 使用普通钱包地址，不使用智能合约
+  //   - 示例：0x74cc09316deab81ee874839e1da9e84ec066369c
+  //
+  // 注意：A2A Agent 不使用 PAYMENT_CONTRACT_ADDRESS（智能合约地址）
+  // ============================================================================
+  const paymentAddress = process.env.PAYMENT_ADDRESS || '0x74cc09316deab81ee874839e1da9e84ec066369c';
+  
+  // 记录使用的地址（用于调试）
+  console.log(`📋 A2A Agent 收款地址配置: PAYMENT_ADDRESS（普通钱包）`);
+  console.log(`   地址: ${paymentAddress}`);
+  
   const config = {
     price: priceWei, // Wei 格式
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
     network: process.env.PAYMENT_NETWORK || 'BSCTest',
-    // Generate Agent 收款地址：0x74cc09316deab81ee874839e1da9e84ec066369c
-    address: process.env.PAYMENT_ADDRESS || '0x74cc09316deab81ee874839e1da9e84ec066369c',
+    address: paymentAddress,
     minAmount: minAmountWei, // Wei 格式
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };

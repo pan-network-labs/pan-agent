@@ -9,9 +9,37 @@ import { ethers } from 'ethers';
 
 // 获取支付配置
 function getPaymentConfig() {
+  // ============================================================================
+  // 【重要】合约支付配置说明：
+  // ============================================================================
+  // PAYMENT_CONTRACT_ADDRESS: 智能合约地址（必需，用于合约支付）
+  //   - 用途：Generate Agent 支付给 Prompt Agent 时调用的合约地址
+  //   - 功能：接收 Generate Agent 的支付，并给用户（recipient）发放 SBT Token
+  //   - 使用场景：
+  //     * Generate Agent 支付给 Prompt Agent（通过合约 makePayment 方法）
+  //   - 流程：Generate Agent → 调用合约 makePayment(recipient, description, referrer) → 合约给用户发放 SBT
+  //   - 示例：0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
+  //
+  // PAYMENT_PRIVATE_KEY: Generate Agent 的钱包私钥（必需）
+  //   - 用途：Generate Agent 自动支付给 Prompt Agent 时使用的私钥
+  //   - 注意：确保私钥安全，不要提交到代码仓库
+  //
+  // 注意：用户支付给 Generate Agent 不使用此配置
+  //      用户支付给 Generate Agent 是直接转账到 PAYMENT_ADDRESS（普通钱包地址）
+  // ============================================================================
+  const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || '';
+  
+  // 记录配置信息（用于调试）
+  if (contractAddress) {
+    console.log(`📋 合约支付配置: PAYMENT_CONTRACT_ADDRESS（智能合约）`);
+    console.log(`   合约地址: ${contractAddress}`);
+  } else {
+    console.warn('⚠️  合约地址未配置: PAYMENT_CONTRACT_ADDRESS 为空');
+  }
+  
   return {
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
-    contractAddress: process.env.PAYMENT_CONTRACT_ADDRESS || '',
+    contractAddress: contractAddress,
     privateKey: process.env.PAYMENT_PRIVATE_KEY || '',
   };
 }

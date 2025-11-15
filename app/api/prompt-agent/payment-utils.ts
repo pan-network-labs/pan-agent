@@ -22,12 +22,35 @@ export function getPaymentConfig() {
     ? ethers.parseEther(minAmountEnv).toString() 
     : minAmountEnv;
   
+  // ============================================================================
+  // 【重要】Prompt Agent 收款地址配置说明：
+  // ============================================================================
+  // PAYMENT_CONTRACT_ADDRESS: 智能合约地址（必需）
+  //   - 用途：Generate Agent 支付给 Prompt Agent 的收款地址（通过智能合约）
+  //   - 功能：接收 Generate Agent 的支付，并给用户发放 SBT Token
+  //   - 说明：Generate Agent 调用 Prompt Agent 时，会通过智能合约支付
+  //   - 流程：Generate Agent → 调用合约 makePayment → 合约给用户发放 SBT
+  //   - 示例：0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
+  //
+  // 注意：Prompt Agent 不使用 PAYMENT_ADDRESS（普通钱包地址）
+  //      Prompt Agent 只接收来自 Generate Agent 的合约支付
+  // ============================================================================
+  const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || '';
+  
+  // 记录使用的地址（用于调试）
+  if (contractAddress) {
+    console.log(`📋 Prompt Agent 收款地址配置: PAYMENT_CONTRACT_ADDRESS（智能合约）`);
+    console.log(`   地址: ${contractAddress}`);
+  } else {
+    console.warn('⚠️  Prompt Agent 收款地址未配置: PAYMENT_CONTRACT_ADDRESS 为空');
+  }
+  
   const config = {
     price: priceWei, // Wei 格式
     currency: process.env.PROMPT_AGENT_CURRENCY || 'BNB',
     network: process.env.PROMPT_AGENT_NETWORK || 'BSCTest',
-    // Prompt Agent 收款地址：使用智能合约地址（合约直接收款）
-    address: process.env.PAYMENT_CONTRACT_ADDRESS || '',
+    // Prompt Agent 收款地址：使用智能合约地址（合约直接收款，给用户发放 SBT）
+    address: contractAddress,
     minAmount: minAmountWei, // Wei 格式
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };
@@ -87,6 +110,7 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     console.log('交易金额:', ethers.formatEther(tx.value), 'BNB');
     console.log('交易状态:', receipt.status === 1 ? '成功' : '失败');
     console.log('期望的合约地址:', PAYMENT_CONFIG.address);
+    console.log('环境变量 PAYMENT_CONTRACT_ADDRESS:', process.env.PAYMENT_CONTRACT_ADDRESS || '(未设置)');
 
     // 验证支付：检查交易的 to 地址是否是合约地址（合约直接收款）
     if (PAYMENT_CONFIG.address) {
@@ -95,14 +119,15 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
       const amountWei = BigInt(tx.value.toString());
       const minAmountWei = BigInt(PAYMENT_CONFIG.minAmount);
 
-      console.log('Prompt Agent 地址验证:', {
-        expectedAddress,
-        toAddress,
-        match: toAddress === expectedAddress,
-        amountWei: amountWei.toString(),
-        minAmountWei: minAmountWei.toString(),
-        amountSufficient: amountWei >= minAmountWei,
-      });
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📍 Prompt Agent 地址验证:');
+      console.log('  - 期望地址（来自 PAYMENT_CONTRACT_ADDRESS）:', expectedAddress);
+      console.log('  - 实际交易接收地址:', toAddress);
+      console.log('  - 地址是否匹配:', toAddress === expectedAddress ? '✅ 匹配' : '❌ 不匹配');
+      console.log('  - 支付金额 (Wei):', amountWei.toString());
+      console.log('  - 最小金额 (Wei):', minAmountWei.toString());
+      console.log('  - 金额是否足够:', amountWei >= minAmountWei ? '✅ 足够' : '❌ 不足');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // 检查交易是否发送到合约地址
       if (toAddress !== expectedAddress) {
