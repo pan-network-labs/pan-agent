@@ -17,9 +17,9 @@ export function getCorsHeaders() {
 // 获取支付验证配置（从环境变量）
 export function getPaymentConfig() {
   // Generate Agent 价格从环境变量读取，环境变量应该是 Wei 格式（字符串）
-  // 默认 0.02 BNB = 20000000000000000 Wei
-  const priceEnv = process.env.PAYMENT_PRICE || '20000000000000000';
-  const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '20000000000000000';
+  // 默认 0.005 BNB = 5000000000000000 Wei
+  const priceEnv = process.env.PAYMENT_PRICE || '5000000000000000';
+  const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '5000000000000000';
   
   // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
   const priceWei = parseFloat(priceEnv) < 1e15 

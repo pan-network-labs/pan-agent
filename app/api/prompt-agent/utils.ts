@@ -55,12 +55,12 @@ export function getAgentCard(baseUrl: string) {
         "name": "generate_prompt",
         "description": "根据主题、风格等要求生成图片生成的提示词",
         "pricing": {
-          "price": "0.01", // Prompt Agent 价格：0.01 BNB
+          "price": "0.001", // Prompt Agent 价格：0.001 BNB
           "currency": "BNB",
           "network": "BSCTest",
           // Prompt Agent 收款地址：使用智能合约地址（合约直接收款）
           "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
-          "note": "调用此能力需要支付 0.01 BNB（支付到智能合约地址）"
+          "note": "调用此能力需要支付 0.001 BNB（支付到智能合约地址）"
         },
         "inputSchema": {
           "type": "object",
@@ -101,12 +101,12 @@ export function getAgentCard(baseUrl: string) {
     },
     "payment": {
       "required": true,
-      "defaultPrice": "0.01", // Prompt Agent 价格：0.01 BNB
+      "defaultPrice": "0.001", // Prompt Agent 价格：0.001 BNB
       "currency": "BNB",
       "network": "BSCTest",
       // Prompt Agent 收款地址：使用智能合约地址（合约直接收款）
       "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
-      "minAmount": "0.01",
+      "minAmount": "0.001",
       "pricingModel": "per_call",
       "note": "调用此 Agent 需要支付，具体价格请查看 capabilities[].pricing 字段（支付到智能合约地址）"
     },

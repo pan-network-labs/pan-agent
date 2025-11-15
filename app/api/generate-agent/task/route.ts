@@ -36,9 +36,9 @@ function getCorsHeaders() {
 // 获取支付验证配置（从环境变量）
 // 环境变量中的价格应该是 Wei 格式（字符串）
 function getPaymentConfig() {
-  // 如果环境变量是 BNB 格式（如 "0.02"），转换为 Wei；如果已经是 Wei 格式，直接使用
-  const priceEnv = process.env.PAYMENT_PRICE || '20000000000000000'; // 默认 0.02 BNB = 20000000000000000 Wei
-  const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '20000000000000000';
+  // 如果环境变量是 BNB 格式（如 "0.005"），转换为 Wei；如果已经是 Wei 格式，直接使用
+  const priceEnv = process.env.PAYMENT_PRICE || '5000000000000000'; // 默认 0.005 BNB = 5000000000000000 Wei
+  const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '5000000000000000';
   
   // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
   const priceWei = parseFloat(priceEnv) < 1e15 

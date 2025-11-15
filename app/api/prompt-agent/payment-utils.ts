@@ -1,7 +1,7 @@
 /**
  * Prompt Agent 支付验证工具
  * 
- * Prompt Agent 是付费服务，价格为 0.01 BNB
+ * Prompt Agent 是付费服务，价格为 0.001 BNB
  * 需要完整的支付验证（X-PAYMENT 机制）
  */
 
@@ -10,9 +10,9 @@ import { ethers } from 'ethers';
 // 获取支付配置
 export function getPaymentConfig() {
   // Prompt Agent 价格从环境变量读取，环境变量应该是 Wei 格式（字符串）
-  // 默认 0.01 BNB = 10000000000000000 Wei
-  const priceEnv = process.env.PROMPT_AGENT_PRICE || '10000000000000000';
-  const minAmountEnv = process.env.PROMPT_AGENT_MIN_AMOUNT || '10000000000000000';
+  // 默认 0.001 BNB = 1000000000000000 Wei
+  const priceEnv = process.env.PROMPT_AGENT_PRICE || '1000000000000000';
+  const minAmountEnv = process.env.PROMPT_AGENT_MIN_AMOUNT || '1000000000000000';
   
   // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
   const priceWei = parseFloat(priceEnv) < 1e15 
