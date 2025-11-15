@@ -197,21 +197,45 @@ export async function callPromptAgentWithPayment(
       requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
     }
     
-    console.log('调用 Prompt Agent，URL:', requestUrl);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📞 Generate Agent 调用 Prompt Agent');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Prompt Agent URL:', promptAgentUrl);
+    console.log('完整请求 URL:', requestUrl);
     console.log('Referrer (传递给 Prompt Agent):', referrer || '(空字符串)');
+    console.log('请求参数:', { topic, style, additionalRequirements });
+    console.log('═══════════════════════════════════════════════════════════');
     
-    const response = await fetch(requestUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // 不传递 X-PAYMENT，让 Prompt Agent 返回 402
-      },
-      body: JSON.stringify({
-        topic,
-        style,
-        additionalRequirements,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(requestUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 不传递 X-PAYMENT，让 Prompt Agent 返回 402
+        },
+        body: JSON.stringify({
+          topic,
+          style,
+          additionalRequirements,
+        }),
+      });
+    } catch (fetchError) {
+      // fetch 失败，可能是网络错误或 URL 错误
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ Fetch 请求失败:');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('请求 URL:', requestUrl);
+      console.error('Prompt Agent URL:', promptAgentUrl);
+      console.error('错误类型:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
+      console.error('错误消息:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      if (fetchError instanceof Error && fetchError.stack) {
+        console.error('错误堆栈:', fetchError.stack);
+      }
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      throw new Error(`无法连接到 Prompt Agent (${requestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
+    }
 
     const result = await response.json();
     
@@ -356,18 +380,45 @@ export async function callPromptAgentWithPayment(
       const xPayment = Buffer.from(paymentResult.txHash, 'utf-8').toString('base64');
 
       // 7. 重新调用 Prompt Agent，带上 X-PAYMENT 头（HTTP 格式）
-      const secondResponse = await fetch(`${promptAgentUrl}/task`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-PAYMENT': xPayment, // 传递支付信息
-        },
-        body: JSON.stringify({
-          topic,
-          style,
-          additionalRequirements,
-        }),
-      });
+      const secondRequestUrl = `${promptAgentUrl}/task`;
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📞 Generate Agent 第二次调用 Prompt Agent（带 X-PAYMENT）');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('请求 URL:', secondRequestUrl);
+      console.log('X-PAYMENT (Base64):', xPayment);
+      console.log('交易哈希:', Buffer.from(xPayment, 'base64').toString('utf-8'));
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      let secondResponse: Response;
+      try {
+        secondResponse = await fetch(secondRequestUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PAYMENT': xPayment, // 传递支付信息
+          },
+          body: JSON.stringify({
+            topic,
+            style,
+            additionalRequirements,
+          }),
+        });
+      } catch (fetchError) {
+        // fetch 失败，可能是网络错误或 URL 错误
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('❌ 第二次 Fetch 请求失败:');
+        console.error('═══════════════════════════════════════════════════════════');
+        console.error('请求 URL:', secondRequestUrl);
+        console.error('Prompt Agent URL:', promptAgentUrl);
+        console.error('错误类型:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
+        console.error('错误消息:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+        if (fetchError instanceof Error && fetchError.stack) {
+          console.error('错误堆栈:', fetchError.stack);
+        }
+        console.error('═══════════════════════════════════════════════════════════');
+        
+        throw new Error(`无法连接到 Prompt Agent (${secondRequestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
+      }
 
       const secondResult = await secondResponse.json();
       

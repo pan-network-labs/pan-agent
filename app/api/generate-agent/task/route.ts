@@ -298,6 +298,15 @@ export async function POST(request: NextRequest) {
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       const agentUrl = process.env.PROMPT_AGENT_URL || `${baseUrl}/api/prompt-agent`;
       
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔗 Generate Agent 准备调用 Prompt Agent');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('当前请求 URL:', requestUrl.toString());
+      console.log('Base URL:', baseUrl);
+      console.log('PROMPT_AGENT_URL 环境变量:', process.env.PROMPT_AGENT_URL || '(未设置)');
+      console.log('最终使用的 Prompt Agent URL:', agentUrl);
+      console.log('═══════════════════════════════════════════════════════════');
+      
       // 使用默认主题，Prompt Agent 会自动生成 prompt
       const defaultTopic = '一幅美丽的抽象艺术作品';
       
