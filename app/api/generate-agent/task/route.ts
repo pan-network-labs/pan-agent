@@ -194,11 +194,38 @@ export async function OPTIONS() {
 
 // 从请求头中获取正确的域名（支持 Vercel）
 function getBaseUrl(request: NextRequest): string {
-  // 优先使用 x-forwarded-host（Vercel 会设置）
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
-  // 优先使用 x-forwarded-proto（Vercel 会设置），否则根据 host 判断
-  const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-  return `${protocol}://${host}`;
+  // 1. 优先使用 Vercel 环境变量（最可靠）
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // 2. 使用 x-forwarded-host（Vercel 会设置）
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost) {
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    return `${protocol}://${forwardedHost}`;
+  }
+  
+  // 3. 使用 host 头
+  const host = request.headers.get('host');
+  if (host) {
+    const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    return `${protocol}://${host}`;
+  }
+  
+  // 4. 从 request.url 中提取（备用）
+  try {
+    const url = new URL(request.url);
+    // 如果 URL 包含 localhost，说明可能是开发环境，否则使用 URL 的 host
+    if (!url.host.includes('localhost')) {
+      return `${url.protocol}//${url.host}`;
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+  
+  // 5. 最后的备用方案
+  return 'https://pan-agent.vercel.app';
 }
 
 export async function POST(request: NextRequest) {
@@ -305,17 +332,23 @@ export async function POST(request: NextRequest) {
       // 获取 Prompt Agent URL（优先使用环境变量，否则使用当前请求的域名自动构建）
       // 使用 getBaseUrl 函数获取正确的域名（支持 Vercel）
       const baseUrl = getBaseUrl(request);
-      const agentUrl = process.env.PROMPT_AGENT_URL || `${baseUrl}/api/prompt-agent`;
+      // 如果 PROMPT_AGENT_URL 包含 localhost，说明是开发环境配置，在生产环境应该忽略
+      const envPromptAgentUrl = process.env.PROMPT_AGENT_URL;
+      const agentUrl = (envPromptAgentUrl && !envPromptAgentUrl.includes('localhost')) 
+        ? envPromptAgentUrl 
+        : `${baseUrl}/api/prompt-agent`;
       
       console.log('═══════════════════════════════════════════════════════════');
       console.log('🔗 Generate Agent 准备调用 Prompt Agent');
       console.log('═══════════════════════════════════════════════════════════');
       console.log('当前请求 URL:', requestUrl.toString());
+      console.log('VERCEL_URL 环境变量:', process.env.VERCEL_URL || '(未设置)');
       console.log('请求头 x-forwarded-host:', request.headers.get('x-forwarded-host') || '(未设置)');
       console.log('请求头 host:', request.headers.get('host') || '(未设置)');
       console.log('请求头 x-forwarded-proto:', request.headers.get('x-forwarded-proto') || '(未设置)');
       console.log('Base URL (计算后):', baseUrl);
-      console.log('PROMPT_AGENT_URL 环境变量:', process.env.PROMPT_AGENT_URL || '(未设置)');
+      console.log('PROMPT_AGENT_URL 环境变量:', envPromptAgentUrl || '(未设置)');
+      console.log('PROMPT_AGENT_URL 是否包含 localhost:', envPromptAgentUrl?.includes('localhost') ? '是（将被忽略）' : '否');
       console.log('最终使用的 Prompt Agent URL:', agentUrl);
       console.log('═══════════════════════════════════════════════════════════');
       
