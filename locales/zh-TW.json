@@ -18,7 +18,11 @@
     "generateError": "生成圖片時發生錯誤",
     "generatedImage": "生成的圖片",
     "viewOriginal": "查看原圖",
-    "downloadImage": "下載圖片"
+    "downloadImage": "下載圖片",
+    "sbtLevel": "SBT 級別",
+    "sbtLevelN": "N級（普通）",
+    "sbtLevelR": "R級（稀有）",
+    "sbtLevelS": "S級（超級稀有）"
   },
   "wallet": {
     "connect": "連接錢包",

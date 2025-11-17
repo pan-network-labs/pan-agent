@@ -213,7 +213,7 @@ export async function callPromptAgentWithPayment(
   additionalRequirements?: string,
   userAddress?: string, // 用户地址（用于给用户发放 SBT）
   referrer?: string // 可选：推广人（从 Generate Agent 的请求 URL 中获取）
-): Promise<{ success: boolean; prompt?: string; error?: any }> {
+): Promise<{ success: boolean; prompt?: string; rarity?: string; error?: any }> {
   try {
     // 1. 先调用 Prompt Agent（不带 X-PAYMENT，HTTP 格式）
     // 如果提供了 referrer，将其添加到 URL 查询参数中
@@ -307,9 +307,24 @@ export async function callPromptAgentWithPayment(
     
     console.log('Prompt Agent 响应数据:', JSON.stringify(result, null, 2));
 
-    // 2. 如果成功，直接返回
-    if (response.ok && result.success) {
+    // 2. 如果成功，直接返回（适配新的返回格式）
+    // 新格式：{ "code": 200, "msg": "success", "data": { "data": "提示词", "rarity": "N" } }
+    if (response.ok && result.code === 200 && result.msg === 'success' && result.data) {
       console.log('Prompt Agent 直接返回成功（可能不需要支付）');
+      const prompt = result.data.data; // 从新格式中提取提示词
+      const rarity = result.data.rarity; // 获取 SBT 级别
+      console.log('提取的提示词:', prompt);
+      console.log('SBT 级别:', rarity);
+      return {
+        success: true,
+        prompt: prompt,
+        rarity: rarity, // 可选：返回 SBT 级别
+      };
+    }
+    
+    // 兼容旧格式（如果 Prompt Agent 还在使用旧格式）
+    if (response.ok && result.success && result.prompt) {
+      console.log('Prompt Agent 返回旧格式（兼容处理）');
       return {
         success: true,
         prompt: result.prompt,
@@ -411,6 +426,9 @@ export async function callPromptAgentWithPayment(
         console.error('═══════════════════════════════════════════════════════════');
         console.error('错误信息:', paymentResult.error || '支付失败');
         console.error('完整结果:', JSON.stringify(paymentResult, null, 2));
+        if (paymentResult.errorDetails) {
+          console.error('错误详情:', JSON.stringify(paymentResult.errorDetails, null, 2));
+        }
         console.error('═══════════════════════════════════════════════════════════');
         
         return {
@@ -422,6 +440,7 @@ export async function callPromptAgentWithPayment(
             details: {
               error: paymentResult.error,
               txHash: paymentResult.txHash || null,
+              ...(paymentResult.errorDetails || {}), // 包含 errorDetails（授权地址信息）
             },
           },
         };
@@ -543,6 +562,48 @@ export async function callPromptAgentWithPayment(
       
       console.log('Prompt Agent 第二次调用响应数据:', JSON.stringify(secondResult, null, 2));
 
+      // 适配新的返回格式：{ "code": 200, "msg": "success", "data": { "data": "提示词", "rarity": "N" } }
+      if (secondResponse.ok && secondResult.code === 200 && secondResult.msg === 'success' && secondResult.data) {
+        const prompt = secondResult.data.data; // 从新格式中提取提示词
+        const rarity = secondResult.data.rarity; // 获取 SBT 级别
+        console.log('✅ Prompt Agent 返回成功（新格式）');
+        console.log('提取的提示词:', prompt);
+        console.log('SBT 级别:', rarity);
+        return {
+          success: true,
+          prompt: prompt,
+          rarity: rarity, // 可选：返回 SBT 级别
+        };
+      }
+      
+      // 兼容旧格式
+      if (secondResponse.ok && secondResult.success && secondResult.prompt) {
+        console.log('✅ Prompt Agent 返回成功（旧格式，兼容处理）');
+        return {
+          success: true,
+          prompt: secondResult.prompt,
+        };
+      }
+
+      // 处理错误情况
+      // 检查是否是新格式的错误响应：{ "code": 非200, "msg": "错误信息", "data": null }
+      if (secondResult.code && secondResult.code !== 200) {
+        const errorMessage = secondResult.msg || '调用 Prompt Agent 失败';
+        console.error('Prompt Agent 返回错误（新格式）:', {
+          code: secondResult.code,
+          msg: errorMessage,
+          data: secondResult.data,
+        });
+        return {
+          success: false,
+          error: {
+            message: errorMessage,
+            code: secondResult.code,
+            data: secondResult.data,
+          },
+        };
+      }
+      
       if (!secondResponse.ok || !secondResult.success) {
         // 提取错误信息
         let errorMessage = '调用 Prompt Agent 失败';

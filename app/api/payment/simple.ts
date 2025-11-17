@@ -20,14 +20,20 @@ function getPaymentConfig() {
   //   - 流程：Generate Agent → 调用合约 makePayment(recipient, description, referrer) → 合约给用户发放 SBT
   //   - 示例：0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
   //
-  // PAYMENT_PRIVATE_KEY: Generate Agent 的钱包私钥（必需）
+  // PAYMENT_PRIVATE_KEY: Generate Agent 的钱包私钥
   //   - 用途：Generate Agent 自动支付给 Prompt Agent 时使用的私钥
-  //   - 注意：确保私钥安全，不要提交到代码仓库
+  //
+  // PROMPT_PRIVATE_KEY: Prompt Agent 的钱包私钥（优先使用）
+  //   - 用途：Prompt Agent 调用合约生成 SBT 时使用的私钥
+  //   - 优先级：如果存在 PROMPT_PRIVATE_KEY，优先使用它；否则使用 PAYMENT_PRIVATE_KEY
   //
   // 注意：用户支付给 Generate Agent 不使用此配置
   //      用户支付给 Generate Agent 是直接转账到 PAYMENT_ADDRESS（普通钱包地址）
   // ============================================================================
   const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || '';
+  
+  // 优先使用 PROMPT_PRIVATE_KEY，否则使用 PAYMENT_PRIVATE_KEY
+  const privateKey = process.env.PROMPT_PRIVATE_KEY || process.env.PAYMENT_PRIVATE_KEY || '';
   
   // 记录配置信息（用于调试）
   if (contractAddress) {
@@ -37,10 +43,16 @@ function getPaymentConfig() {
     console.warn('⚠️  合约地址未配置: PAYMENT_CONTRACT_ADDRESS 为空');
   }
   
+  if (process.env.PROMPT_PRIVATE_KEY) {
+    console.log(`📋 使用的私钥: PROMPT_PRIVATE_KEY（Prompt Agent）`);
+  } else if (process.env.PAYMENT_PRIVATE_KEY) {
+    console.log(`📋 使用的私钥: PAYMENT_PRIVATE_KEY（Generate Agent）`);
+  }
+  
   return {
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
     contractAddress: contractAddress,
-    privateKey: process.env.PAYMENT_PRIVATE_KEY || '',
+    privateKey: privateKey,
   };
 }
 
@@ -55,12 +67,27 @@ export async function makeContractPayment(
   contractAddress?: string, // 可选：指定合约地址（如果不提供，使用环境变量中的地址）
   referrer: string = '', // 可选：推广人（字符串格式，默认为空字符串）
   rarity: SBTRarity = 'N' // 可选：SBT 级别（N级、R级、S级），默认为 N级
-): Promise<{ success: boolean; txHash?: string; error?: string }> {
+): Promise<{ success: boolean; txHash?: string; error?: string; errorDetails?: any }> {
   try {
     const config = getPaymentConfig();
     
-    if (!config.privateKey) {
-      return { success: false, error: 'PAYMENT_PRIVATE_KEY not configured' };
+    // 直接使用配置中的私钥（已优先使用 PROMPT_PRIVATE_KEY，否则使用 PAYMENT_PRIVATE_KEY）
+    const usedPrivateKey = config.privateKey;
+    
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 makeContractPayment 私钥检查');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('PROMPT_PRIVATE_KEY 是否存在:', process.env.PROMPT_PRIVATE_KEY ? '是' : '否');
+    console.log('PAYMENT_PRIVATE_KEY 是否存在:', process.env.PAYMENT_PRIVATE_KEY ? '是' : '否');
+    console.log('最终使用的私钥来源:', process.env.PROMPT_PRIVATE_KEY ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+    if (usedPrivateKey) {
+      const testWallet = new ethers.Wallet(usedPrivateKey);
+      console.log('使用的私钥对应的地址:', testWallet.address);
+    }
+    console.log('═══════════════════════════════════════════════════════════');
+    
+    if (!usedPrivateKey) {
+      return { success: false, error: 'Private key not configured (neither PROMPT_PRIVATE_KEY nor PAYMENT_PRIVATE_KEY in env)' };
     }
     
     // 使用提供的地址或环境变量中的地址
@@ -76,7 +103,7 @@ export async function makeContractPayment(
 
     // 1. 创建钱包和提供者
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-    const wallet = new ethers.Wallet(config.privateKey, provider);
+    const wallet = new ethers.Wallet(usedPrivateKey, provider);
 
     // 2. 检查钱包余额
     const balance = await provider.getBalance(wallet.address);
@@ -152,6 +179,7 @@ export async function makeContractPayment(
     } catch (gasError: any) {
       // Gas 估算失败，说明合约调用会失败
       let errorMessage = '合约调用失败（gas 估算失败）';
+      let authorizedMinterAddress: string | null = null;
       
       if (gasError?.reason) {
         errorMessage = `合约调用失败: ${gasError.reason}`;
@@ -165,10 +193,58 @@ export async function makeContractPayment(
         }
       }
       
-      console.error('Gas 估算失败:', gasError);
+      // 如果是 "Only authorized minter" 错误，查询合约的授权 minter 地址
+      if (errorMessage.includes('Only authorized minter') || errorMessage.includes('authorized minter')) {
+        try {
+          const contract = new ethers.Contract(targetAddress, ['function authorizedMinter() view returns (address)'], provider);
+          authorizedMinterAddress = await contract.authorizedMinter();
+          console.log('查询到合约的授权 minter 地址:', authorizedMinterAddress);
+        } catch (queryError) {
+          console.error('查询授权 minter 地址失败:', queryError);
+        }
+      }
+      
+      // 检查实际使用的私钥来源
+      const isUsingPromptKey = !!process.env.PROMPT_PRIVATE_KEY;
+      
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ 合约调用失败（Gas 估算阶段）');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('当前使用的钱包地址:', wallet.address);
+      console.error('使用的私钥来源:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+      if (authorizedMinterAddress) {
+        console.error('合约的授权 minter 地址:', authorizedMinterAddress);
+        console.error('⚠️  地址不匹配！请检查：');
+        if (isUsingPromptKey) {
+          console.error('   当前使用 PROMPT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
+          console.error('   解决方案：将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+        } else {
+          console.error('   当前使用 PAYMENT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
+          console.error('   解决方案：将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+        }
+      }
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      // 构建详细的错误信息
+      const detailedError: any = {
+        message: errorMessage,
+        currentAddress: wallet.address,
+        privateKeySource: isUsingPromptKey ? 'PROMPT_PRIVATE_KEY (env var)' : 'PAYMENT_PRIVATE_KEY (env var)',
+      };
+      
+      if (authorizedMinterAddress) {
+        detailedError.authorizedMinterAddress = authorizedMinterAddress;
+        if (isUsingPromptKey) {
+          detailedError.solution = `请将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+        } else {
+          detailedError.solution = `请将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+        }
+      }
+      
       return {
         success: false,
         error: errorMessage,
+        errorDetails: detailedError,
       };
     }
 
@@ -293,6 +369,20 @@ export async function makeContractPayment(
     
     // 提取更详细的错误信息
     let errorMessage = 'Unknown error';
+    let authorizedMinterAddress: string | null = null;
+    let currentAddress: string | null = null;
+    
+    // 尝试获取当前使用的钱包地址
+    try {
+      const config = getPaymentConfig();
+      if (config.privateKey) {
+        const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+        const wallet = new ethers.Wallet(config.privateKey, provider);
+        currentAddress = wallet.address;
+      }
+    } catch (e) {
+      // 忽略获取地址的错误
+    }
     
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -311,9 +401,68 @@ export async function makeContractPayment(
       errorMessage = error.message;
     }
     
+    // 如果是 "Only authorized minter" 错误，查询合约的授权 minter 地址
+    if (errorMessage.includes('Only authorized minter') || errorMessage.includes('authorized minter')) {
+      try {
+        const config = getPaymentConfig();
+        const targetAddress = contractAddress || config.contractAddress;
+        if (targetAddress) {
+          const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+          const contract = new ethers.Contract(targetAddress, ['function authorizedMinter() view returns (address)'], provider);
+          authorizedMinterAddress = await contract.authorizedMinter();
+          console.log('查询到合约的授权 minter 地址:', authorizedMinterAddress);
+        }
+      } catch (queryError) {
+        console.error('查询授权 minter 地址失败:', queryError);
+      }
+    }
+    
+    // 检查实际使用的私钥来源
+    const isUsingPromptKey = !!process.env.PROMPT_PRIVATE_KEY;
+    
+    console.error('═══════════════════════════════════════════════════════════');
+    console.error('❌ 合约调用失败');
+    console.error('═══════════════════════════════════════════════════════════');
+    if (currentAddress) {
+      console.error('当前使用的钱包地址:', currentAddress);
+      console.error('使用的私钥来源:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+    }
+    if (authorizedMinterAddress) {
+      console.error('合约的授权 minter 地址:', authorizedMinterAddress);
+      console.error('⚠️  地址不匹配！');
+      if (isUsingPromptKey) {
+        console.error('   当前使用 PROMPT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
+        console.error('   解决方案：将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+      } else {
+        console.error('   当前使用 PAYMENT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
+        console.error('   解决方案：将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+      }
+    }
+    console.error('═══════════════════════════════════════════════════════════');
+    
+    // 构建详细的错误信息
+    const errorDetails: any = {
+      message: errorMessage,
+    };
+    
+    if (currentAddress) {
+      errorDetails.currentAddress = currentAddress;
+      errorDetails.privateKeySource = isUsingPromptKey ? 'PROMPT_PRIVATE_KEY (env var)' : 'PAYMENT_PRIVATE_KEY (env var)';
+    }
+    
+    if (authorizedMinterAddress) {
+      errorDetails.authorizedMinterAddress = authorizedMinterAddress;
+      if (isUsingPromptKey) {
+        errorDetails.solution = `请将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+      } else {
+        errorDetails.solution = `请将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+      }
+    }
+    
     return {
       success: false,
       error: errorMessage,
+      errorDetails: Object.keys(errorDetails).length > 1 ? errorDetails : undefined,
     };
   }
 }

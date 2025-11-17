@@ -12,9 +12,9 @@
  * 说明：
  * - 需要先支付（X-PAYMENT 机制），否则返回 402 状态码
  * - Generate Agent 会自动调用 Prompt Agent 获取 prompt，并自动支付给 Prompt Agent（0.01 BNB）
- * - 实际发送给智谱AI的prompt会自动添加前缀："异常抽象的油画："
- * - 图片尺寸固定为：1024x1024
- * - 需要配置环境变量：ZHIPUAI_API_KEY、PAYMENT_PRIVATE_KEY、PAYMENT_CONTRACT_ADDRESS
+ * - 使用通义万相 wan2.5-t2i-preview 模型生成图片
+ * - 图片尺寸固定为：1024*1024，水印：false
+ * - 需要配置环境变量：QWEN_API_KEY、PAYMENT_PRIVATE_KEY、PAYMENT_CONTRACT_ADDRESS
  * - 可选环境变量：PROMPT_AGENT_URL（如果不设置，会自动使用当前请求的域名构建）
  */
 
@@ -358,6 +358,7 @@ export async function POST(request: NextRequest) {
     // 流程：先调用 → 收到 402 → 解析支付信息 → 向智能合约支付（传入用户地址作为 recipient） → 重新调用
     // 使用默认主题，让 Prompt Agent 自动生成 prompt
     let finalPrompt: string;
+    let sbtRarity: string | null = null; // SBT 级别（N、R、S）
     try {
       // 获取 Prompt Agent URL（优先使用环境变量，否则使用当前请求的域名自动构建）
       // 使用 getBaseUrl 函数获取正确的域名（支持 Vercel）
@@ -455,7 +456,9 @@ export async function POST(request: NextRequest) {
       }
 
       finalPrompt = promptResult.prompt;
+      sbtRarity = promptResult.rarity || null; // 获取 SBT 级别（N、R、S）
       console.log('从 Prompt Agent 获取的 prompt:', finalPrompt);
+      console.log('SBT 级别:', sbtRarity || '未返回');
     } catch (error) {
       console.error('═══════════════════════════════════════════════════════════');
       console.error('❌ Generate Agent 调用 Prompt Agent 时发生异常错误:');
@@ -493,13 +496,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 调用智谱AI生成图片
-    const zhipuApiKey = process.env.ZHIPUAI_API_KEY;
-    if (!zhipuApiKey) {
+    // 3. 调用通义万相生成图片（异步API）
+    const qwenApiKey = process.env.QWEN_API_KEY;
+    if (!qwenApiKey) {
       return NextResponse.json(
         {
           code: 500,
-          msg: 'ZHIPUAI_API_KEY 环境变量未配置',
+          msg: 'QWEN_API_KEY 环境变量未配置',
           data: null,
         },
         {
@@ -509,32 +512,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 构建完整的 prompt（添加前缀）
-    const fullPrompt = `异常抽象的油画：${finalPrompt}`;
+    // 构建完整的 prompt
+    const fullPrompt = `${finalPrompt}`;
     
-    console.log('调用智谱AI生成图片，完整 prompt:', fullPrompt);
+    console.log('调用通义万相生成图片，完整 prompt:', fullPrompt);
+    console.log('使用模型: wan2.5-t2i-preview');
+    console.log('分辨率: 1024*1024');
+    console.log('水印: false');
 
-    const zhipuResponse = await fetch('https://open.bigmodel.cn/api/paas/v4/images/generations', {
+    // 步骤1：创建异步任务（新加坡地域）
+    const createTaskResponse = await fetch('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${zhipuApiKey}`,
+        'X-DashScope-Async': 'enable',
+        'Authorization': `Bearer ${qwenApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'cogview-3-flash',
-        prompt: fullPrompt,
-        size: '1024x1024',
-        n: 1,
+        model: 'wan2.5-t2i-preview',
+        input: {
+          prompt: fullPrompt,
+        },
+        parameters: {
+          size: '1024*1024',
+          n: 1,
+          watermark: false,
+        },
       }),
     });
 
-    if (!zhipuResponse.ok) {
-      const errorText = await zhipuResponse.text();
-      console.error('智谱AI API 错误:', errorText);
+    if (!createTaskResponse.ok) {
+      const errorText = await createTaskResponse.text();
+      console.error('通义万相创建任务失败:', errorText);
       return NextResponse.json(
         {
           code: 500,
-          msg: `智谱AI API 调用失败: ${errorText}`,
+          msg: `通义万相创建任务失败: ${errorText}`,
           data: null,
         },
         {
@@ -544,14 +557,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const zhipuData = await zhipuResponse.json();
+    const createTaskData = await createTaskResponse.json();
+    const taskId = createTaskData.output?.task_id;
     
-    if (!zhipuData.data || !zhipuData.data[0] || !zhipuData.data[0].url) {
-      console.error('智谱AI 响应格式错误:', zhipuData);
+    if (!taskId) {
+      console.error('通义万相响应格式错误（缺少 task_id）:', createTaskData);
       return NextResponse.json(
         {
           code: 500,
-          msg: '智谱AI 响应格式错误',
+          msg: '通义万相响应格式错误（缺少 task_id）',
           data: null,
         },
         {
@@ -561,16 +575,102 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const imageUrl = zhipuData.data[0].url;
-    console.log('图片生成成功，URL:', imageUrl);
+    console.log('任务创建成功，task_id:', taskId);
+    console.log('开始轮询任务结果...');
 
-    // 4. 返回成功响应
+    // 步骤2：轮询获取任务结果
+    const maxAttempts = 60; // 最多轮询60次（约2分钟）
+    const pollInterval = 2000; // 每2秒轮询一次
+    let imageUrl: string | null = null;
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      attempts++;
+
+      const queryResponse = await fetch(`https://dashscope-intl.aliyuncs.com/api/v1/tasks/${taskId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${qwenApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!queryResponse.ok) {
+        const errorText = await queryResponse.text();
+        console.error(`查询任务结果失败（第${attempts}次）:`, errorText);
+        continue;
+      }
+
+      const queryData = await queryResponse.json();
+      const taskStatus = queryData.output?.task_status;
+
+      console.log(`第${attempts}次查询，任务状态:`, taskStatus);
+
+      if (taskStatus === 'SUCCEEDED') {
+        const results = queryData.output?.results;
+        if (results && results[0] && results[0].url) {
+          imageUrl = results[0].url;
+          console.log('图片生成成功，URL:', imageUrl);
+          break;
+        } else {
+          console.error('任务成功但响应格式错误（缺少 url）:', queryData);
+          return NextResponse.json(
+            {
+              code: 500,
+              msg: '任务成功但响应格式错误（缺少 url）',
+              data: null,
+            },
+            {
+              status: 500,
+              headers: getCorsHeaders(),
+            }
+          );
+        }
+      } else if (taskStatus === 'FAILED') {
+        console.error('任务失败:', queryData);
+        return NextResponse.json(
+          {
+            code: 500,
+            msg: `图片生成任务失败: ${queryData.output?.message || '未知错误'}`,
+            data: null,
+          },
+          {
+            status: 500,
+            headers: getCorsHeaders(),
+          }
+        );
+      } else if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
+        // 继续等待
+        continue;
+      } else {
+        console.warn('未知的任务状态:', taskStatus);
+      }
+    }
+
+    if (!imageUrl) {
+      console.error('任务超时，未获取到图片URL');
+      return NextResponse.json(
+        {
+          code: 500,
+          msg: '图片生成超时，请稍后重试',
+          data: null,
+        },
+        {
+          status: 500,
+          headers: getCorsHeaders(),
+        }
+      );
+    }
+
+    // 4. 返回成功响应（包含 SBT 级别信息）
     return NextResponse.json(
       {
         code: 200,
         msg: 'success',
         data: {
           data: imageUrl,
+          rarity: sbtRarity || null, // 返回 SBT 级别（N、R、S）
         },
       },
       {

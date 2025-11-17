@@ -18,7 +18,11 @@
     "generateError": "Error generating image",
     "generatedImage": "Generated Image",
     "viewOriginal": "View Original",
-    "downloadImage": "Download Image"
+    "downloadImage": "Download Image",
+    "sbtLevel": "SBT Level",
+    "sbtLevelN": "N (Normal)",
+    "sbtLevelR": "R (Rare)",
+    "sbtLevelS": "S (Super Rare)"
   },
   "wallet": {
     "connect": "Connect Wallet",

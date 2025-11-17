@@ -183,6 +183,7 @@ export default function Home() {
   const { t, loading: i18nLoading } = useTranslations(currentLocale);
   
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [sbtRarity, setSbtRarity] = useState<string | null>(null); // SBT 级别（N、R、S）
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
@@ -249,6 +250,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setImageUrl(null);
+    setSbtRarity(null); // 重置 SBT 级别
     setPaymentInfo(null);
     setShowPaymentModal(false);
 
@@ -674,6 +676,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setImageUrl(null);
+    setSbtRarity(null); // 重置 SBT 级别
 
     try {
       // 从 URL 中获取 referrer，确保在请求中包含
@@ -714,11 +717,40 @@ export default function Home() {
         // 如果 data.data 包含错误信息，显示详细错误
         const errorInfo = data.data?.error || null;
         const errorMsg = data.msg || '生成图片失败';
+        
         if (errorInfo) {
-          const errorDetails = typeof errorInfo === 'object' 
-            ? JSON.stringify(errorInfo, null, 2)
-            : String(errorInfo);
-          throw new Error(`${errorMsg}\n\n错误详情:\n${errorDetails}`);
+          let errorDetails = '';
+          
+          if (typeof errorInfo === 'object') {
+            // 检查是否有 details 字段，包含授权地址信息
+            const details = errorInfo.details || errorInfo;
+            if (details.authorizedMinterAddress || details.currentAddress) {
+              // 构建包含地址信息的错误消息
+              errorDetails = `\n\n【地址信息】\n`;
+              if (details.currentAddress) {
+                errorDetails += `当前使用的地址（无权限）: ${details.currentAddress}\n`;
+              }
+              if (details.authorizedMinterAddress) {
+                errorDetails += `正确的授权地址: ${details.authorizedMinterAddress}\n`;
+              }
+              errorDetails += `\n请确保 PROMPT_PRIVATE_KEY 对应的地址已被授权为合约的 minter。\n`;
+              
+              // 添加其他错误详情（如果有）
+              const otherDetails = { ...details };
+              delete otherDetails.authorizedMinterAddress;
+              delete otherDetails.currentAddress;
+              if (Object.keys(otherDetails).length > 0 && otherDetails.error) {
+                errorDetails += `\n其他错误详情:\n${JSON.stringify(otherDetails, null, 2)}`;
+              }
+            } else {
+              // 普通错误详情
+              errorDetails = `\n\n错误详情:\n${JSON.stringify(errorInfo, null, 2)}`;
+            }
+          } else {
+            errorDetails = `\n\n错误详情:\n${String(errorInfo)}`;
+          }
+          
+          throw new Error(`${errorMsg}${errorDetails}`);
         } else {
           throw new Error(errorMsg);
         }
@@ -964,9 +996,25 @@ export default function Home() {
           {/* 图片展示区域 */}
           {imageUrl && (
             <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                生成的图片
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  生成的图片
+                </h2>
+                {sbtRarity && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">{t('home.sbtLevel')}:</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      sbtRarity === 'S' 
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
+                        : sbtRarity === 'R'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                    }`}>
+                      {sbtRarity === 'S' ? t('home.sbtLevelS') : sbtRarity === 'R' ? t('home.sbtLevelR') : t('home.sbtLevelN')}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="relative w-full aspect-square bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
                 <Image
                   src={imageUrl}

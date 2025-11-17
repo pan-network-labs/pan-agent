@@ -146,8 +146,9 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'cogview-3-flash',
-        prompt: `异常抽象的油画：${prompt}`,
+        // model: 'cogview-3-flash',
+        model: 'cogview-4-250304',
+        prompt: `${prompt}`,
         size: '1024x1024',
       }),
     });
@@ -360,9 +361,10 @@ export function getAgentCard(baseUrl: string) {
     },
     "metadata": {
       "provider": "ZhipuAI",
-      "model": "cogview-3-flash",
+      // "model": "cogview-3-flash",
+      "model": "cogview-4-250304",
       "imageSize": "1024x1024",
-      "style": "异常抽象的油画"
+      "style": ""
     }
   };
 }

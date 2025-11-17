@@ -182,8 +182,9 @@ export async function POST(request: NextRequest) {
     if (!promptPrivateKey) {
       return NextResponse.json(
         {
-          success: false,
-          error: 'PROMPT_PRIVATE_KEY 未配置',
+          code: 500,
+          msg: 'PROMPT_PRIVATE_KEY 未配置',
+          data: null,
         },
         {
           status: 500,
@@ -192,56 +193,82 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 验证 PROMPT_PRIVATE_KEY 对应的地址
+    const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
+    const promptWallet = new ethers.Wallet(promptPrivateKey, provider);
+    const promptWalletAddress = promptWallet.address;
+    
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔑 使用 PROMPT_PRIVATE_KEY 调用合约');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('PROMPT_PRIVATE_KEY 对应的钱包地址:', promptWalletAddress);
+    console.log('⚠️  请确保此地址已被授权为合约的 minter');
+    console.log('═══════════════════════════════════════════════════════════');
+
     // 将支付金额从 Wei 转换为 BNB 格式
     const amountBNB = ethers.formatEther(PAYMENT_CONFIG.price);
     
     console.log('═══════════════════════════════════════════════════════════');
     console.log('💰 调用合约生成 SBT');
     console.log('═══════════════════════════════════════════════════════════');
+    console.log('使用的私钥: PROMPT_PRIVATE_KEY');
+    console.log('钱包地址 (minter):', promptWalletAddress);
     console.log('用户地址 (recipient):', userAddress);
     console.log('SBT 级别:', rarity);
     console.log('支付金额 (BNB):', amountBNB);
+    console.log('合约地址:', PAYMENT_CONFIG.address);
     console.log('Referrer:', referrer || '(空字符串)');
     console.log('═══════════════════════════════════════════════════════════');
 
-    // 临时设置 PAYMENT_PRIVATE_KEY 为 PROMPT_PRIVATE_KEY，以便 makeContractPayment 使用
-    const originalPrivateKey = process.env.PAYMENT_PRIVATE_KEY;
-    process.env.PAYMENT_PRIVATE_KEY = promptPrivateKey;
+    // makeContractPayment 会自动从环境变量读取 PROMPT_PRIVATE_KEY（优先）或 PAYMENT_PRIVATE_KEY
+    const sbtResult = await makeContractPayment(
+      amountBNB,
+      `Prompt Agent 服务费用`,
+      userAddress, // 用户地址（接收 SBT）
+      PAYMENT_CONFIG.address, // 合约地址
+      referrer || '', // 推广人
+      rarity // SBT 级别
+    );
 
-    try {
-      const sbtResult = await makeContractPayment(
-        amountBNB,
-        `Prompt Agent 服务费用`,
-        userAddress, // 用户地址（接收 SBT）
-        PAYMENT_CONFIG.address, // 合约地址
-        referrer || '', // 推广人
-        rarity // SBT 级别
-      );
-
-      if (!sbtResult.success) {
-        console.error('生成 SBT 失败:', sbtResult.error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: `生成 SBT 失败: ${sbtResult.error}`,
+    if (!sbtResult.success) {
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ 生成 SBT 失败');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('使用的钱包地址 (minter):', promptWalletAddress);
+      console.error('错误信息:', sbtResult.error);
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('⚠️  可能的原因：');
+      console.error('  1. 钱包地址未被授权为合约的 minter');
+      console.error('  2. 钱包余额不足');
+      console.error('  3. 合约调用参数错误');
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      return NextResponse.json(
+        {
+          code: 500,
+          msg: `生成 SBT 失败: ${sbtResult.error}`,
+          data: {
+            error: sbtResult.error,
+            minterAddress: promptWalletAddress,
+            hint: '请确保 PROMPT_PRIVATE_KEY 对应的地址已被授权为合约的 minter',
+            ...(sbtResult.errorDetails || {}), // 包含授权地址信息
           },
-          {
-            status: 500,
-            headers: getCorsHeaders(),
-          }
-        );
-      }
-
-      console.log('✅ SBT 生成成功');
-      console.log('交易哈希:', sbtResult.txHash);
-    } finally {
-      // 恢复原始的 PAYMENT_PRIVATE_KEY
-      if (originalPrivateKey !== undefined) {
-        process.env.PAYMENT_PRIVATE_KEY = originalPrivateKey;
-      } else {
-        delete process.env.PAYMENT_PRIVATE_KEY;
-      }
+        },
+        {
+          status: 500,
+          headers: getCorsHeaders(),
+        }
+      );
     }
+
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ SBT 生成成功');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('使用的钱包地址 (minter):', promptWalletAddress);
+    console.log('交易哈希:', sbtResult.txHash);
+    console.log('SBT 级别:', rarity);
+    console.log('用户地址 (recipient):', userAddress);
+    console.log('═══════════════════════════════════════════════════════════');
 
     // 6. 根据 SBT 级别从环境变量中读取对应的提示词（直接使用，不进行任何替换）
     const promptEnvKey = rarity === 'N' ? 'PROMPT_N' : rarity === 'R' ? 'PROMPT_R' : 'PROMPT_S';
@@ -271,9 +298,12 @@ export async function POST(request: NextRequest) {
     // 7. 返回成功响应
     return NextResponse.json(
       {
-        success: true,
-        prompt: finalPrompt, // 直接返回环境变量中的提示词
-        rarity: rarity, // 返回生成的 SBT 级别
+        code: 200,
+        msg: 'success',
+        data: {
+          data: finalPrompt, // 直接返回环境变量中的提示词
+          rarity: rarity, // 返回生成的 SBT 级别
+        },
       },
       {
         headers: getCorsHeaders(),
