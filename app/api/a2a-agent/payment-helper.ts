@@ -65,7 +65,8 @@ export async function preparePaymentForAgent(
       `支付给 ${discovery.card.name} 的 ${capabilityName} 能力`,
       userAddress, // 用户地址（用于发放 SBT）
       contractAddress, // 合约地址
-      referrer || '' // 推广人（字符串格式，如果没有则使用空字符串）
+      referrer || '', // 推广人（字符串格式，如果没有则使用空字符串）
+      'N' // SBT 级别（默认为 N 级）
     );
 
     if (!paymentResult.success || !paymentResult.txHash) {

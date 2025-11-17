@@ -399,7 +399,8 @@ export async function callPromptAgentWithPayment(
         `支付给 Prompt Agent 的 generate_prompt 能力`,
         userAddress, // 用户地址（用于给用户发放 SBT）
         address, // 使用从 x402 响应中获取的合约地址
-        referrer || '' // 推广人（字符串格式，如果没有则使用空字符串）
+        referrer || '', // 推广人（字符串格式，如果没有则使用空字符串）
+        'N' // SBT 级别（默认为 N 级）
       );
       
       console.log('合约支付结果:', paymentResult);

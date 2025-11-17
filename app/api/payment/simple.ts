@@ -44,13 +44,17 @@ function getPaymentConfig() {
   };
 }
 
+// SBT 级别类型
+export type SBTRarity = 'N' | 'R' | 'S';
+
 // 调用智能合约支付（合约直接收款，给 recipient 发放 SBT）
 export async function makeContractPayment(
   amount: string,
   description: string = '',
   recipient: string, // 必需：接收 SBT 的地址（用户付款的钱包地址）
   contractAddress?: string, // 可选：指定合约地址（如果不提供，使用环境变量中的地址）
-  referrer: string = '' // 可选：推广人（字符串格式，默认为空字符串）
+  referrer: string = '', // 可选：推广人（字符串格式，默认为空字符串）
+  rarity: SBTRarity = 'N' // 可选：SBT 级别（N级、R级、S级），默认为 N级
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   try {
     const config = getPaymentConfig();
@@ -87,11 +91,18 @@ export async function makeContractPayment(
     }
 
     // 3. 准备智能合约调用数据
-    // 合约方法：makePayment(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // 根据 rarity 选择不同的合约方法：
+    // - N级：mintNSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // - R级：mintRSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // - S级：mintSSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
     // recipient 用于给用户发放 SBT
     // referrer 用于统计推广人（可选，如果没有提供则使用空字符串）
+    
+    // 根据 rarity 选择方法名
+    const methodName = rarity === 'N' ? 'mintNSBT' : rarity === 'R' ? 'mintRSBT' : 'mintSSBT';
+    
     const iface = new ethers.Interface([
-      'function makePayment(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)'
+      `function ${methodName}(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)`
     ]);
     
     // referrer 已经是字符串格式，如果没有提供则使用空字符串
@@ -106,17 +117,20 @@ export async function makeContractPayment(
     console.log('  - 支付金额 (Wei):', ethers.parseEther(amount).toString());
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🎯 SBT 发放目标钱包地址 (recipient):', recipient);
-    console.log('   ⚠️  这是接收 SBT 的用户钱包地址');
+    console.log('   ⚠️  合约将向此地址发放 SBT Token');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  - Referrer (字符串):', referrerString || '(空字符串)');
     console.log('  - Description:', description || '(空字符串)');
+    console.log('  - Referrer:', referrerString || '(空字符串)');
+    console.log('  - SBT 级别:', rarity, `(${rarity === 'N' ? 'N级（普通）' : rarity === 'R' ? 'R级（稀有）' : 'S级（超级稀有）'})`);
+    console.log('  - 合约方法:', methodName);
+    console.log('═══════════════════════════════════════════════════════════');
     
-    // 编码函数调用数据
-    const data = iface.encodeFunctionData('makePayment', [recipient, description || '', referrerString]);
+    // 编码函数调用数据（使用根据 rarity 选择的方法名）
+    const data = iface.encodeFunctionData(methodName, [recipient, description || '', referrerString]);
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📦 编码后的合约调用数据 (data):', data);
-    console.log('📤 传递给合约的 makePayment 参数:');
+    console.log('📤 传递给合约的参数:');
     console.log('  - recipient (SBT 接收者):', recipient);
     console.log('  - description:', description || '(空字符串)');
     console.log('  - referrer:', referrerString || '(空字符串)');

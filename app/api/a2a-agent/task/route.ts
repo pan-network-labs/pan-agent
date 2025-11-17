@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
       let result;
       if (useContract) {
         // 使用合约支付，传入 recipient 用于发放 SBT，referrer 用于统计推广人
-        result = await makeContractPayment(amount, description, recipient, undefined, referrer || '');
+        result = await makeContractPayment(amount, description, recipient, undefined, referrer || '', 'N');
       } else {
         result = await makeDirectPayment(recipient, amount);
       }

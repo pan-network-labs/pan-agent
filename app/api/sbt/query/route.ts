@@ -287,7 +287,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 快速统计：使用 getRarityStatsByOwner
+// 快速统计：使用 getRarityStatsByOwner（支持 N、R、S 三个级别）
 async function getRarityStats(request: NextRequest, address: string) {
   try {
     const config = getPaymentConfig();
@@ -302,15 +302,59 @@ async function getRarityStats(request: NextRequest, address: string) {
     const contract = new ethers.Contract(config.contractAddress, PAYMENT_SBT_ABI as any, provider);
 
     try {
+      // 直接调用合约的 getRarityStatsByOwner 方法
+      // 合约方法签名：getRarityStatsByOwner(address user) returns (uint256 nCount, uint256 rCount, uint256 sCount, uint256 totalCount)
+      // 根据 ABI，返回值为命名元组，ethers.js 会将其解析为对象或数组
       const result = await contract.getRarityStatsByOwner(address);
+      
+      // 处理返回结果（ethers.js v6 可能返回数组或对象，取决于 ABI 定义）
+      let nCount: string;
+      let rCount: string;
+      let sCount: string;
+      let totalCount: string;
+      
+      // 优先尝试按命名属性访问（如果 ABI 中有命名）
+      if (result && typeof result === 'object') {
+        if ('nCount' in result && 'rCount' in result && 'sCount' in result && 'totalCount' in result) {
+          // 对象格式：{ nCount, rCount, sCount, totalCount }
+          nCount = result.nCount.toString();
+          rCount = result.rCount.toString();
+          sCount = result.sCount.toString();
+          totalCount = result.totalCount.toString();
+        } else if (Array.isArray(result) && result.length >= 4) {
+          // 数组格式：[nCount, rCount, sCount, totalCount]
+          nCount = result[0].toString();
+          rCount = result[1].toString();
+          sCount = result[2].toString();
+          totalCount = result[3].toString();
+        } else if (result.length !== undefined && result.length >= 4) {
+          // 类数组对象（ethers.js 的特殊格式）
+          nCount = result[0]?.toString() || '0';
+          rCount = result[1]?.toString() || '0';
+          sCount = result[2]?.toString() || '0';
+          totalCount = result[3]?.toString() || '0';
+        } else {
+          throw new Error('无法解析合约返回的统计结果格式');
+        }
+      } else {
+        throw new Error('合约返回的结果格式不正确');
+      }
+      
+      console.log('✅ 成功调用合约 getRarityStatsByOwner 方法');
+      console.log('  - 原始返回结果类型:', typeof result, Array.isArray(result) ? '(数组)' : '(对象)');
+      console.log('  - N级数量:', nCount);
+      console.log('  - R级数量:', rCount);
+      console.log('  - S级数量:', sCount);
+      console.log('  - 总数量:', totalCount);
       
       return jsonResponse({
         success: true,
         data: {
           address,
-          commonCount: result.commonCount.toString(),
-          rareCount: result.rareCount.toString(),
-          totalCount: result.totalCount.toString(),
+          nCount, // N级（普通）数量
+          rCount, // R级（稀有）数量
+          sCount, // S级（超级稀有）数量
+          totalCount, // 总数量
           contractAddress: config.contractAddress,
         },
       });
