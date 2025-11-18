@@ -477,6 +477,8 @@ export async function callPromptAgentWithPayment(
       const xPayment = Buffer.from(paymentResult.txHash, 'utf-8').toString('base64');
 
       // 7. 重新调用 Prompt Agent，带上 X-PAYMENT 头（HTTP 格式）
+      // 重要：在请求体中传递 userAddress，因为 X-PAYMENT 中的交易是 Generate Agent 发起的，
+      // 所以 tx.from 是 Generate Agent 的地址，不是用户的地址
       const secondRequestUrl = `${promptAgentUrl}/task`;
       console.log('═══════════════════════════════════════════════════════════');
       console.log('📞 Generate Agent 第二次调用 Prompt Agent（带 X-PAYMENT）');
@@ -484,6 +486,7 @@ export async function callPromptAgentWithPayment(
       console.log('请求 URL:', secondRequestUrl);
       console.log('X-PAYMENT (Base64):', xPayment);
       console.log('交易哈希:', Buffer.from(xPayment, 'base64').toString('utf-8'));
+      console.log('用户地址 (在请求体中传递):', userAddress);
       console.log('═══════════════════════════════════════════════════════════');
       
       let secondResponse: Response;
@@ -498,6 +501,7 @@ export async function callPromptAgentWithPayment(
             topic,
             style,
             additionalRequirements,
+            userAddress, // 重要：传递用户地址，因为 X-PAYMENT 中的交易是 Generate Agent 发起的
           }),
         });
       } catch (fetchError) {

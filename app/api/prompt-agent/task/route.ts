@@ -138,28 +138,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 解析 HTTP 请求体（虽然不需要使用，但保持兼容性）
+    // 2. 解析 HTTP 请求体
     const body = await request.json();
 
-    // 3. 从交易中获取用户地址（payer）
-    let userAddress: string | undefined;
-    try {
-      const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
-      const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
-      const tx = await provider.getTransaction(tsHash);
-      if (tx) {
-        userAddress = tx.from;
-        console.log('从交易中获取用户地址:', userAddress);
+    // 3. 获取用户地址（recipient，用于发放 SBT）
+    // 优先级：
+    // 1. 从请求体中获取 userAddress（Generate Agent 传递的，因为 X-PAYMENT 中的交易是 Generate Agent 发起的）
+    // 2. 如果请求体中没有，则从 X-PAYMENT 交易中提取（用户直接调用 Prompt Agent 的情况）
+    let userAddress: string | undefined = body.userAddress;
+    
+    if (!userAddress) {
+      // 如果请求体中没有 userAddress，尝试从交易中获取（用户直接调用的情况）
+      try {
+        const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
+        const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
+        const tx = await provider.getTransaction(tsHash);
+        if (tx) {
+          userAddress = tx.from;
+          console.log('从交易中获取用户地址（用户直接调用）:', userAddress);
+        }
+      } catch (error) {
+        console.error('获取用户地址失败:', error);
       }
-    } catch (error) {
-      console.error('获取用户地址失败:', error);
+    } else {
+      console.log('从请求体中获取用户地址（Agent 间调用）:', userAddress);
     }
 
     if (!userAddress) {
       return NextResponse.json(
         {
-          success: false,
-          error: '无法从交易中获取用户地址',
+          code: 500,
+          msg: '无法获取用户地址（用于发放 SBT）',
+          data: null,
         },
         {
           status: 500,
