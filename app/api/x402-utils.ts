@@ -1,69 +1,69 @@
 /**
- * x402 协议标准格式工具函数
- * 参考：Coinbase x402 协议规范
+ * x402 Protocol Standard Format Utility Functions
+ * Reference: Coinbase x402 Protocol Specification
  */
 
 import { ethers } from 'ethers';
 
 export interface X402PaymentRequirement {
-  scheme: string; // 支付方案，如 "exact"
-  network: string; // 区块链网络，如 "BSCTest"
-  currency: string; // 货币类型，如 "BNB"
-  address: string; // 收款地址
-  maxAmountRequired: string; // 所需支付的最大金额（Wei 格式，字符串）
-  resource: string; // 需要支付的资源的 URL
-  description: string; // 资源的描述
-  mimeType: string; // 资源响应的 MIME 类型
-  ext?: { // 扩展字段（可选）
-    referrer?: string; // 推广人地址
-    error?: string; // 错误信息（验证失败时）
-    errorDetails?: any; // 错误详情（验证失败时）
+  scheme: string; // Payment scheme, e.g. "exact"
+  network: string; // Blockchain network, e.g. "BSCTest"
+  currency: string; // Currency type, e.g. "BNB"
+  address: string; // Payment address
+  maxAmountRequired: string; // Maximum amount required for payment (Wei format, string)
+  resource: string; // URL of the resource that requires payment
+  description: string; // Description of the resource
+  mimeType: string; // MIME type of the resource response
+  ext?: { // Extension field (optional)
+    referrer?: string; // Referrer address
+    error?: string; // Error message (when validation fails)
+    errorDetails?: any; // Error details (when validation fails)
   };
 }
 
 export interface X402Response {
-  x402Version: number; // 协议版本号
-  accepts: X402PaymentRequirement[]; // 可接受的支付方式数组
+  x402Version: number; // Protocol version number
+  accepts: X402PaymentRequirement[]; // Array of acceptable payment methods
 }
 
 /**
- * 生成 x402 标准格式的支付响应
+ * Generate x402 standard format payment response
  */
 export function createX402Response(
   config: {
-    price: string; // Wei 格式的金额（字符串），如 "20000000000000000"
-    currency: string; // 货币类型，如 "BNB"
-    network: string; // 网络名称，如 "BSCTest"
-    address: string; // 收款地址
-    resource: string; // 资源 URL
-    description?: string; // 资源描述（可选）
-    mimeType?: string; // MIME 类型（可选，默认 "application/json"）
-    referrer?: string; // 推广人地址（可选）
-    error?: string; // 错误信息（验证失败时，可选）
-    errorDetails?: any; // 错误详情（验证失败时，可选）
+    price: string; // Amount in Wei format (string), e.g. "20000000000000000"
+    currency: string; // Currency type, e.g. "BNB"
+    network: string; // Network name, e.g. "BSCTest"
+    address: string; // Payment address
+    resource: string; // Resource URL
+    description?: string; // Resource description (optional)
+    mimeType?: string; // MIME type (optional, default "application/json")
+    referrer?: string; // Referrer address (optional)
+    error?: string; // Error message (when validation fails, optional)
+    errorDetails?: any; // Error details (when validation fails, optional)
   }
 ): X402Response {
-  // price 已经是 Wei 格式，直接使用
+  // price is already in Wei format, use directly
   const maxAmountRequired = config.price;
 
-  // 构建 resource URL（保留地址查询参数以保持向后兼容）
+  // Build resource URL (preserve address query parameter for backward compatibility)
   const resourceUrl = new URL(config.resource);
   resourceUrl.searchParams.set('address', config.address);
   const resource = resourceUrl.toString();
 
-  // 构建 accepts 对象
+  // Build accepts object
   const acceptsItem: X402PaymentRequirement = {
-    scheme: 'exact', // 精确支付方案
+    scheme: 'exact', // Exact payment scheme
     network: config.network,
-    currency: config.currency, // 货币类型
-    address: config.address, // 收款地址
+    currency: config.currency, // Currency type
+    address: config.address, // Payment address
     maxAmountRequired: maxAmountRequired,
     resource: resource,
     description: config.description || `Payment required: ${ethers.formatEther(config.price)} ${config.currency}`,
     mimeType: config.mimeType || 'application/json',
   };
 
-  // 构建 ext 字段（如果有 referrer 或 error）
+  // Build ext field (if referrer or error exists)
   if (config.referrer || config.error) {
     acceptsItem.ext = {};
     if (config.referrer) {

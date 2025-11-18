@@ -1,24 +1,24 @@
 /**
- * Prompt Agent Task 端点
+ * Prompt Agent Task Endpoint
  * POST /api/prompt-agent/task
  * 
- * HTTP 格式的 API（非 JSON-RPC 2.0）
+ * HTTP format API (not JSON-RPC 2.0)
  * 
- * 请求格式：
+ * Request format:
  * {
- *   "topic": "string", // 必需，图片主题
- *   "style": "string", // 可选，艺术风格
- *   "additionalRequirements": "string" // 可选，额外要求
+ *   "topic": "string", // Required, image topic
+ *   "style": "string", // Optional, art style
+ *   "additionalRequirements": "string" // Optional, additional requirements
  * }
  * 
- * 响应格式（成功）：
+ * Response format (success):
  * {
  *   "success": true,
  *   "prompt": "string",
  *   "topic": "string"
  * }
  * 
- * 响应格式（失败）：
+ * Response format (failure):
  * {
  *   "success": false,
  *   "error": "string"
@@ -32,49 +32,49 @@ import { createX402Response } from '../../x402-utils';
 import { makeContractPayment, SBTRarity } from '../../payment/simple';
 import { ethers } from 'ethers';
 
-// 处理预检请求（OPTIONS）
+// Handle preflight requests (OPTIONS)
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
 /**
- * 随机生成 SBT 级别
- * N级: 94.75%
- * R级: 5%
- * S级: 0.25%
+ * Randomly generate SBT rarity level
+ * N level: 94.75%
+ * R level: 5%
+ * S level: 0.25%
  */
 function generateRandomRarity(): SBTRarity {
-  const random = Math.random() * 100; // 0-100 的随机数
+  const random = Math.random() * 100; // Random number between 0-100
   
   if (random < 0.25) {
-    // S级: 0-0.25 (0.25%)
+    // S level: 0-0.25 (0.25%)
     return 'S';
   } else if (random < 5.25) {
-    // R级: 0.25-5.25 (5%)
+    // R level: 0.25-5.25 (5%)
     return 'R';
   } else {
-    // N级: 5.25-100 (94.75%)
+    // N level: 5.25-100 (94.75%)
     return 'N';
   }
 }
 
-// POST /api/prompt-agent/task - 处理任务请求（HTTP 格式）
+// POST /api/prompt-agent/task - Handle task requests (HTTP format)
 export async function POST(request: NextRequest) {
   try {
-    // 1. 支付验证（X-PAYMENT 机制）
+    // 1. Payment validation (X-PAYMENT mechanism)
     const PAYMENT_CONFIG = getPaymentConfig();
     const xPaymentHeader = request.headers.get('X-PAYMENT');
     
-    // 获取当前请求的 URL 作为 resource
+    // Get current request URL as resource
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // 从查询参数中获取 referrer（推广人地址）
+    // Get referrer from query parameters (referrer address)
     const referrer = requestUrl.searchParams.get('referrer') || undefined;
     
-    // 必须提供 X-PAYMENT
+    // X-PAYMENT header is required
     if (!xPaymentHeader) {
-      // 使用 x402 标准格式（直接返回，不在 error.data 中）
+      // Use x402 standard format (return directly, not in error.data)
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
@@ -83,17 +83,17 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: 'Payment required to access prompt generation service',
         mimeType: 'application/json',
-        referrer: referrer, // 如果有 referrer，包含在响应中
+        referrer: referrer, // Include referrer in response if present
       });
       
-      console.log('Prompt Agent 返回 402 响应（合约交易信息）:');
-      console.log('完整 x402 响应:', JSON.stringify(x402Response, null, 2));
-      console.log('合约地址:', PAYMENT_CONFIG.address);
-      console.log('支付金额 (Wei):', PAYMENT_CONFIG.price);
-      console.log('支付金额 (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
-      console.log('货币:', PAYMENT_CONFIG.currency);
-      console.log('网络:', PAYMENT_CONFIG.network);
-      console.log('Referrer:', referrer || '(空字符串)');
+      console.log('Prompt Agent returning 402 response (contract transaction info):');
+      console.log('Full x402 response:', JSON.stringify(x402Response, null, 2));
+      console.log('Contract address:', PAYMENT_CONFIG.address);
+      console.log('Payment amount (Wei):', PAYMENT_CONFIG.price);
+      console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
+      console.log('Currency:', PAYMENT_CONFIG.currency);
+      console.log('Network:', PAYMENT_CONFIG.network);
+      console.log('Referrer:', referrer || '(empty string)');
       console.log('Resource:', resource);
       
       return NextResponse.json(
@@ -105,11 +105,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 验证支付
+    // Validate payment
     const paymentValidation = await validatePayment(xPaymentHeader);
     
     if (!paymentValidation.valid) {
-      // 使用 x402 标准格式（直接返回，不在 error.data 中）
+      // Use x402 standard format (return directly, not in error.data)
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
@@ -118,16 +118,16 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: 'Payment validation failed, please retry',
         mimeType: 'application/json',
-        referrer: referrer, // 如果有 referrer，包含在响应中
+        referrer: referrer, // Include referrer in response if present
       });
       
-      console.log('Prompt Agent 支付验证失败，返回 402 响应（合约交易信息）:');
-      console.log('完整 x402 响应:', JSON.stringify(x402Response, null, 2));
-      console.log('合约地址:', PAYMENT_CONFIG.address);
-      console.log('支付金额 (Wei):', PAYMENT_CONFIG.price);
-      console.log('支付金额 (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
-      console.log('Referrer:', referrer || '(空字符串)');
-      console.log('验证错误:', paymentValidation.error);
+      console.log('Prompt Agent payment validation failed, returning 402 response (contract transaction info):');
+      console.log('Full x402 response:', JSON.stringify(x402Response, null, 2));
+      console.log('Contract address:', PAYMENT_CONFIG.address);
+      console.log('Payment amount (Wei):', PAYMENT_CONFIG.price);
+      console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
+      console.log('Referrer:', referrer || '(empty string)');
+      console.log('Validation error:', paymentValidation.error);
       
       return NextResponse.json(
         x402Response,
@@ -138,37 +138,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 解析 HTTP 请求体
+    // 2. Parse HTTP request body
     const body = await request.json();
 
-    // 3. 获取用户地址（recipient，用于发放 SBT）
-    // 优先级：
-    // 1. 从请求体中获取 userAddress（Generate Agent 传递的，因为 X-PAYMENT 中的交易是 Generate Agent 发起的）
-    // 2. 如果请求体中没有，则从 X-PAYMENT 交易中提取（用户直接调用 Prompt Agent 的情况）
+    // 3. Get user address (recipient, for SBT issuance)
+    // Priority:
+    // 1. Get userAddress from request body (passed by Generate Agent, because the transaction in X-PAYMENT was initiated by Generate Agent)
+    // 2. If not in request body, extract from X-PAYMENT transaction (user directly calling Prompt Agent)
     let userAddress: string | undefined = body.userAddress;
     
     if (!userAddress) {
-      // 如果请求体中没有 userAddress，尝试从交易中获取（用户直接调用的情况）
+      // If userAddress is not in request body, try to get it from transaction (user directly calling)
       try {
         const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
         const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
         const tx = await provider.getTransaction(tsHash);
         if (tx) {
           userAddress = tx.from;
-          console.log('从交易中获取用户地址（用户直接调用）:', userAddress);
+          console.log('Got user address from transaction (user direct call):', userAddress);
         }
       } catch (error) {
-        console.error('获取用户地址失败:', error);
+        console.error('Failed to get user address:', error);
       }
     } else {
-      console.log('从请求体中获取用户地址（Agent 间调用）:', userAddress);
+      console.log('Got user address from request body (inter-agent call):', userAddress);
     }
 
     if (!userAddress) {
       return NextResponse.json(
         {
           code: 500,
-          msg: '无法获取用户地址（用于发放 SBT）',
+          msg: 'Unable to get user address (for SBT issuance)',
           data: null,
         },
         {
@@ -178,22 +178,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. 随机生成 SBT 级别（N: 94.75%, R: 5%, S: 0.25%）
+    // 4. Randomly generate SBT rarity level (N: 94.75%, R: 5%, S: 0.25%)
     const rarity = generateRandomRarity();
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('🎲 随机生成 SBT 级别');
+    console.log('🎲 Randomly generating SBT rarity level');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('生成的级别:', rarity, `(${rarity === 'N' ? 'N级（普通）' : rarity === 'R' ? 'R级（稀有）' : 'S级（超级稀有）'})`);
-    console.log('概率分布: N级 94.75%, R级 5%, S级 0.25%');
+    console.log('Generated level:', rarity, `(${rarity === 'N' ? 'N (Normal)' : rarity === 'R' ? 'R (Rare)' : 'S (Super Rare)'})`);
+    console.log('Probability distribution: N 94.75%, R 5%, S 0.25%');
     console.log('═══════════════════════════════════════════════════════════');
 
-    // 5. 使用 PROMPT_PRIVATE_KEY 调用合约生成对应级别的 SBT
+    // 5. Use PROMPT_PRIVATE_KEY to call contract and mint SBT of corresponding level
     const promptPrivateKey = process.env.PROMPT_PRIVATE_KEY;
     if (!promptPrivateKey) {
       return NextResponse.json(
         {
           code: 500,
-          msg: 'PROMPT_PRIVATE_KEY 未配置',
+          msg: 'PROMPT_PRIVATE_KEY not configured',
           data: null,
         },
         {
@@ -203,65 +203,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 验证 PROMPT_PRIVATE_KEY 对应的地址
+    // Verify the address corresponding to PROMPT_PRIVATE_KEY
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     const promptWallet = new ethers.Wallet(promptPrivateKey, provider);
     const promptWalletAddress = promptWallet.address;
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('🔑 使用 PROMPT_PRIVATE_KEY 调用合约');
+    console.log('🔑 Using PROMPT_PRIVATE_KEY to call contract');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('PROMPT_PRIVATE_KEY 对应的钱包地址:', promptWalletAddress);
-    console.log('⚠️  请确保此地址已被授权为合约的 minter');
+    console.log('Wallet address corresponding to PROMPT_PRIVATE_KEY:', promptWalletAddress);
+    console.log('⚠️  Please ensure this address is authorized as contract minter');
     console.log('═══════════════════════════════════════════════════════════');
 
-    // 将支付金额从 Wei 转换为 BNB 格式
+    // Convert payment amount from Wei to BNB format
     const amountBNB = ethers.formatEther(PAYMENT_CONFIG.price);
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('💰 调用合约生成 SBT');
+    console.log('💰 Calling contract to mint SBT');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('使用的私钥: PROMPT_PRIVATE_KEY');
-    console.log('钱包地址 (minter):', promptWalletAddress);
-    console.log('用户地址 (recipient):', userAddress);
-    console.log('SBT 级别:', rarity);
-    console.log('支付金额 (BNB):', amountBNB);
-    console.log('合约地址:', PAYMENT_CONFIG.address);
-    console.log('Referrer:', referrer || '(空字符串)');
+    console.log('Private key used: PROMPT_PRIVATE_KEY');
+    console.log('Wallet address (minter):', promptWalletAddress);
+    console.log('User address (recipient):', userAddress);
+    console.log('SBT level:', rarity);
+    console.log('Payment amount (BNB):', amountBNB);
+    console.log('Contract address:', PAYMENT_CONFIG.address);
+    console.log('Referrer:', referrer || '(empty string)');
     console.log('═══════════════════════════════════════════════════════════');
 
-    // makeContractPayment 会自动从环境变量读取 PROMPT_PRIVATE_KEY（优先）或 PAYMENT_PRIVATE_KEY
+    // makeContractPayment will automatically read PROMPT_PRIVATE_KEY (priority) or PAYMENT_PRIVATE_KEY from environment variables
     const sbtResult = await makeContractPayment(
       amountBNB,
-      `Prompt Agent 服务费用`,
-      userAddress, // 用户地址（接收 SBT）
-      PAYMENT_CONFIG.address, // 合约地址
-      referrer || '', // 推广人
-      rarity // SBT 级别
+      `Prompt Agent Service Fee`,
+      userAddress, // User address (receives SBT)
+      PAYMENT_CONFIG.address, // Contract address
+      referrer || '', // Referrer
+      rarity // SBT level
     );
 
     if (!sbtResult.success) {
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ 生成 SBT 失败');
+      console.error('❌ Failed to mint SBT');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('使用的钱包地址 (minter):', promptWalletAddress);
-      console.error('错误信息:', sbtResult.error);
+      console.error('Wallet address used (minter):', promptWalletAddress);
+      console.error('Error message:', sbtResult.error);
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('⚠️  可能的原因：');
-      console.error('  1. 钱包地址未被授权为合约的 minter');
-      console.error('  2. 钱包余额不足');
-      console.error('  3. 合约调用参数错误');
+      console.error('⚠️  Possible reasons:');
+      console.error('  1. Wallet address is not authorized as contract minter');
+      console.error('  2. Insufficient wallet balance');
+      console.error('  3. Incorrect contract call parameters');
       console.error('═══════════════════════════════════════════════════════════');
       
       return NextResponse.json(
         {
           code: 500,
-          msg: `生成 SBT 失败: ${sbtResult.error}`,
+          msg: `Failed to mint SBT: ${sbtResult.error}`,
           data: {
             error: sbtResult.error,
             minterAddress: promptWalletAddress,
-            hint: '请确保 PROMPT_PRIVATE_KEY 对应的地址已被授权为合约的 minter',
-            ...(sbtResult.errorDetails || {}), // 包含授权地址信息
+            hint: 'Please ensure the address corresponding to PROMPT_PRIVATE_KEY is authorized as contract minter',
+            ...(sbtResult.errorDetails || {}), // Include authorization address info
           },
         },
         {
@@ -272,15 +272,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('✅ SBT 生成成功');
+    console.log('✅ SBT minted successfully');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('使用的钱包地址 (minter):', promptWalletAddress);
-    console.log('交易哈希:', sbtResult.txHash);
-    console.log('SBT 级别:', rarity);
-    console.log('用户地址 (recipient):', userAddress);
+    console.log('Wallet address used (minter):', promptWalletAddress);
+    console.log('Transaction hash:', sbtResult.txHash);
+    console.log('SBT level:', rarity);
+    console.log('User address (recipient):', userAddress);
     console.log('═══════════════════════════════════════════════════════════');
 
-    // 6. 根据 SBT 级别从环境变量中读取对应的提示词（直接使用，不进行任何替换）
+    // 6. Read corresponding prompt from environment variable based on SBT level (use directly, no replacement)
     const promptEnvKey = rarity === 'N' ? 'PROMPT_N' : rarity === 'R' ? 'PROMPT_R' : 'PROMPT_S';
     const finalPrompt = process.env[promptEnvKey];
 
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `${promptEnvKey} 环境变量未配置`,
+          error: `${promptEnvKey} environment variable not configured`,
         },
         {
           status: 500,
@@ -298,21 +298,21 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📝 使用提示词');
+    console.log('📝 Using prompt');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('使用的环境变量:', promptEnvKey);
-    console.log('SBT 级别:', rarity);
-    console.log('提示词:', finalPrompt);
+    console.log('Environment variable used:', promptEnvKey);
+    console.log('SBT level:', rarity);
+    console.log('Prompt:', finalPrompt);
     console.log('═══════════════════════════════════════════════════════════');
 
-    // 7. 返回成功响应
+    // 7. Return success response
     return NextResponse.json(
       {
         code: 200,
         msg: 'success',
         data: {
-          data: finalPrompt, // 直接返回环境变量中的提示词
-          rarity: rarity, // 返回生成的 SBT 级别
+          data: finalPrompt, // Return prompt from environment variable directly
+          rarity: rarity, // Return generated SBT level
         },
       },
       {
@@ -320,11 +320,11 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('处理任务时发生错误:', error);
+    console.error('Error processing task:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       {
         status: 500,

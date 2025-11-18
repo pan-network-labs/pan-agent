@@ -1,20 +1,20 @@
 /**
- * Prompt Agent 支付验证工具
+ * Prompt Agent Payment Validation Utilities
  * 
- * Prompt Agent 是付费服务，价格为 0.001 BNB
- * 需要完整的支付验证（X-PAYMENT 机制）
+ * Prompt Agent is a paid service, price is 0.001 BNB
+ * Requires complete payment validation (X-PAYMENT mechanism)
  */
 
 import { ethers } from 'ethers';
 
-// 获取支付配置
+// Get payment configuration
 export function getPaymentConfig() {
-  // Prompt Agent 价格从环境变量读取，环境变量应该是 Wei 格式（字符串）
-  // 默认 0.001 BNB = 1000000000000000 Wei
+  // Prompt Agent price read from environment variables, should be in Wei format (string)
+  // Default 0.001 BNB = 1000000000000000 Wei
   const priceEnv = process.env.PROMPT_AGENT_PRICE || '1000000000000000';
   const minAmountEnv = process.env.PROMPT_AGENT_MIN_AMOUNT || '1000000000000000';
   
-  // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
+  // Determine if BNB format or Wei format (BNB format usually < 1e15, Wei format usually > 1e15)
   const priceWei = parseFloat(priceEnv) < 1e15 
     ? ethers.parseEther(priceEnv).toString() 
     : priceEnv;
@@ -23,46 +23,46 @@ export function getPaymentConfig() {
     : minAmountEnv;
   
   // ============================================================================
-  // 【重要】Prompt Agent 收款地址配置说明：
+  // 【Important】Prompt Agent Payment Address Configuration:
   // ============================================================================
-  // PAYMENT_CONTRACT_ADDRESS: 智能合约地址（必需）
-  //   - 用途：Generate Agent 支付给 Prompt Agent 的收款地址（通过智能合约）
-  //   - 功能：接收 Generate Agent 的支付，并给用户发放 SBT Token
-  //   - 说明：Generate Agent 调用 Prompt Agent 时，会通过智能合约支付
-  //   - 流程：Generate Agent → 调用合约 makePayment → 合约给用户发放 SBT
-  //   - 示例：0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
+  // PAYMENT_CONTRACT_ADDRESS: Smart contract address (required)
+  //   - Purpose: Address for Generate Agent to pay Prompt Agent (through smart contract)
+  //   - Function: Receive payment from Generate Agent and issue SBT Token to user
+  //   - Note: When Generate Agent calls Prompt Agent, payment is made through smart contract
+  //   - Flow: Generate Agent → call contract makePayment → contract issues SBT to user
+  //   - Example: 0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
   //
-  // 注意：Prompt Agent 不使用 PAYMENT_ADDRESS（普通钱包地址）
-  //      Prompt Agent 只接收来自 Generate Agent 的合约支付
+  // Note: Prompt Agent does not use PAYMENT_ADDRESS (regular wallet address)
+  //       Prompt Agent only receives contract payment from Generate Agent
   // ============================================================================
   const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || '';
   
-  // 记录使用的地址（用于调试）
+  // Log address used (for debugging)
   if (contractAddress) {
-    console.log(`📋 Prompt Agent 收款地址配置: PAYMENT_CONTRACT_ADDRESS（智能合约）`);
-    console.log(`   地址: ${contractAddress}`);
+    console.log(`📋 Prompt Agent payment address configuration: PAYMENT_CONTRACT_ADDRESS (smart contract)`);
+    console.log(`   Address: ${contractAddress}`);
   } else {
-    console.warn('⚠️  Prompt Agent 收款地址未配置: PAYMENT_CONTRACT_ADDRESS 为空');
+    console.warn('⚠️  Prompt Agent payment address not configured: PAYMENT_CONTRACT_ADDRESS is empty');
   }
   
   const config = {
-    price: priceWei, // Wei 格式
+    price: priceWei, // Wei format
     currency: process.env.PROMPT_AGENT_CURRENCY || 'BNB',
     network: process.env.PROMPT_AGENT_NETWORK || 'BSCTest',
-    // Prompt Agent 收款地址：使用智能合约地址（合约直接收款，给用户发放 SBT）
+    // Prompt Agent payment address: use smart contract address (contract directly receives payment, issues SBT to user)
     address: contractAddress,
-    minAmount: minAmountWei, // Wei 格式
+    minAmount: minAmountWei, // Wei format
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };
 
   return config;
 }
 
-// 验证支付信息
+// Validate payment information
 export async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: boolean; error?: any }> {
   const PAYMENT_CONFIG = getPaymentConfig();
 
-  // 必须提供 X-PAYMENT 头
+  // X-PAYMENT header is required
   if (!xPaymentHeader) {
     return {
       valid: false,
@@ -75,21 +75,21 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     };
   }
 
-  // 完整验证逻辑（与 generate agent 相同）
+  // Complete validation logic (same as generate agent)
   try {
-    console.log('Prompt Agent 开始验证支付，X-PAYMENT 头:', xPaymentHeader);
+    console.log('Prompt Agent starting payment validation, X-PAYMENT header:', xPaymentHeader);
     const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
-    console.log('解码后的交易哈希:', tsHash);
+    console.log('Decoded transaction hash:', tsHash);
     
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     const tx = await provider.getTransaction(tsHash);
     
     if (!tx) {
-      console.error('Prompt Agent 支付验证失败: 交易不存在', tsHash);
-      return { valid: false, error: '交易不存在' };
+      console.error('Prompt Agent payment validation failed: transaction does not exist', tsHash);
+      return { valid: false, error: 'Transaction does not exist' };
     }
 
-    console.log('Prompt Agent 找到交易:', {
+    console.log('Prompt Agent found transaction:', {
       hash: tsHash,
       from: tx.from,
       to: tx.to,
@@ -99,20 +99,20 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
 
     const receipt = await provider.getTransactionReceipt(tsHash);
     if (!receipt) {
-      console.error('Prompt Agent 支付验证失败: 交易尚未确认', tsHash);
-      return { valid: false, error: '交易尚未确认' };
+      console.error('Prompt Agent payment validation failed: transaction not yet confirmed', tsHash);
+      return { valid: false, error: 'Transaction not yet confirmed' };
     }
 
-    console.log('Prompt Agent 交易信息:');
-    console.log('交易哈希:', tsHash);
-    console.log('发送方:', tx.from);
-    console.log('接收方（合约地址）:', tx.to);
-    console.log('交易金额:', ethers.formatEther(tx.value), 'BNB');
-    console.log('交易状态:', receipt.status === 1 ? '成功' : '失败');
-    console.log('期望的合约地址:', PAYMENT_CONFIG.address);
-    console.log('环境变量 PAYMENT_CONTRACT_ADDRESS:', process.env.PAYMENT_CONTRACT_ADDRESS || '(未设置)');
+    console.log('Prompt Agent transaction information:');
+    console.log('Transaction hash:', tsHash);
+    console.log('Sender:', tx.from);
+    console.log('Recipient (contract address):', tx.to);
+    console.log('Transaction amount:', ethers.formatEther(tx.value), 'BNB');
+    console.log('Transaction status:', receipt.status === 1 ? 'Success' : 'Failed');
+    console.log('Expected contract address:', PAYMENT_CONFIG.address);
+    console.log('Environment variable PAYMENT_CONTRACT_ADDRESS:', process.env.PAYMENT_CONTRACT_ADDRESS || '(not set)');
 
-    // 验证支付：检查交易的 to 地址是否是合约地址（合约直接收款）
+    // Validate payment: check if transaction to address is contract address (contract directly receives payment)
     if (PAYMENT_CONFIG.address) {
       const expectedAddress = PAYMENT_CONFIG.address.toLowerCase();
       const toAddress = tx.to?.toLowerCase();
@@ -120,51 +120,51 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
       const minAmountWei = BigInt(PAYMENT_CONFIG.minAmount);
 
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📍 Prompt Agent 地址验证:');
-      console.log('  - 期望地址（来自 PAYMENT_CONTRACT_ADDRESS）:', expectedAddress);
-      console.log('  - 实际交易接收地址:', toAddress);
-      console.log('  - 地址是否匹配:', toAddress === expectedAddress ? '✅ 匹配' : '❌ 不匹配');
-      console.log('  - 支付金额 (Wei):', amountWei.toString());
-      console.log('  - 最小金额 (Wei):', minAmountWei.toString());
-      console.log('  - 金额是否足够:', amountWei >= minAmountWei ? '✅ 足够' : '❌ 不足');
+      console.log('📍 Prompt Agent address validation:');
+      console.log('  - Expected address (from PAYMENT_CONTRACT_ADDRESS):', expectedAddress);
+      console.log('  - Actual transaction recipient address:', toAddress);
+      console.log('  - Address match:', toAddress === expectedAddress ? '✅ Match' : '❌ Mismatch');
+      console.log('  - Payment amount (Wei):', amountWei.toString());
+      console.log('  - Minimum amount (Wei):', minAmountWei.toString());
+      console.log('  - Is amount sufficient:', amountWei >= minAmountWei ? '✅ Sufficient' : '❌ Insufficient');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // 检查交易是否发送到合约地址
+      // Check if transaction is sent to contract address
       if (toAddress !== expectedAddress) {
-        console.error('Prompt Agent 支付验证失败: 收款地址不匹配', {
+        console.error('Prompt Agent payment validation failed: recipient address mismatch', {
           expected: expectedAddress,
           actual: toAddress,
         });
-        return { valid: false, error: `收款地址不匹配（应发送到合约地址 ${expectedAddress}，实际发送到 ${toAddress}）` };
+        return { valid: false, error: `Recipient address mismatch (should send to contract address ${expectedAddress}, actually sent to ${toAddress})` };
       }
 
       if (amountWei < minAmountWei) {
-        console.error('Prompt Agent 支付验证失败: 交易金额不足', {
+        console.error('Prompt Agent payment validation failed: insufficient transaction amount', {
           required: minAmountWei.toString(),
           actual: amountWei.toString(),
         });
-        return { valid: false, error: `交易金额不足（需要至少 ${ethers.formatEther(minAmountWei)} BNB，实际 ${ethers.formatEther(amountWei)} BNB）` };
+        return { valid: false, error: `Insufficient transaction amount (requires at least ${ethers.formatEther(minAmountWei)} BNB, actual ${ethers.formatEther(amountWei)} BNB)` };
       }
     } else {
-      console.error('Prompt Agent 支付验证失败: PAYMENT_CONTRACT_ADDRESS 未配置');
-      return { valid: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' };
+      console.error('Prompt Agent payment validation failed: PAYMENT_CONTRACT_ADDRESS not configured');
+      return { valid: false, error: 'PAYMENT_CONTRACT_ADDRESS not configured' };
     }
 
     if (receipt.status !== 1) {
-      console.error('Prompt Agent 支付验证失败: 交易失败', {
+      console.error('Prompt Agent payment validation failed: transaction failed', {
         status: receipt.status,
         hash: tsHash,
       });
-      return { valid: false, error: '交易失败' };
+      return { valid: false, error: 'Transaction failed' };
     }
 
-    console.log('Prompt Agent 支付验证成功');
+    console.log('Prompt Agent payment validation successful');
     return { valid: true };
   } catch (error) {
-    console.error('支付验证错误:', error);
+    console.error('Payment validation error:', error);
     return {
       valid: false,
-      error: error instanceof Error ? error.message : '支付验证失败',
+      error: error instanceof Error ? error.message : 'Payment validation failed',
     };
   }
 }

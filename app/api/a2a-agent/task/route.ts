@@ -1,9 +1,9 @@
 /**
- * A2A Agent Task 端点
+ * A2A Agent Task Endpoint
  * POST /api/a2a-agent/task
  * 
- * 处理 HTTP 格式的任务请求
- * 使用查询参数 ?action=xxx 来指定调用的能力
+ * Handle HTTP format task requests
+ * Use query parameter ?action=xxx to specify the capability to call
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,28 +13,28 @@ import { callPromptAgent } from '../agent-client';
 import { preparePaymentForAgent } from '../payment-helper';
 import { createX402Response } from '../../x402-utils';
 
-// 处理预检请求（OPTIONS）
+// Handle preflight requests (OPTIONS)
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
-// POST /api/a2a-agent/task - 处理任务请求（HTTP 格式）
+// POST /api/a2a-agent/task - Handle task requests (HTTP format)
 export async function POST(request: NextRequest) {
   try {
-    // 1. 支付验证
+    // 1. Payment validation
     const PAYMENT_CONFIG = getPaymentConfig();
     const xPaymentHeader = request.headers.get('X-PAYMENT');
     
-    // 获取当前请求的 URL 作为 resource
+    // Get current request URL as resource
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // 从查询参数中获取 action（能力名称）和 referrer（推广人地址）
+    // Get action (capability name) and referrer (referrer address) from query parameters
     const action = requestUrl.searchParams.get('action') || 'generate_image';
     const referrer = requestUrl.searchParams.get('referrer') || undefined;
     
     if (!xPaymentHeader) {
-      // 使用 x402 标准格式
+      // Use x402 standard format
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
     
     const paymentValidation = await validatePayment(xPaymentHeader);
     
-    // 获取用户地址（从支付交易中）
+    // Get user address (from payment transaction)
     const userAddress = paymentValidation.userAddress;
     
     if (!paymentValidation.valid) {
-      // 使用 x402 标准格式
+      // Use x402 standard format
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
@@ -82,10 +82,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 解析 HTTP 请求体
+    // 2. Parse HTTP request body
     const body = await request.json().catch(() => ({}));
 
-    // 3. 处理 generate_image 能力
+    // 3. Handle generate_image capability
     if (action === 'generate_image') {
       const { prompt } = body;
       
@@ -103,14 +103,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 4. 生成图片
+      // 4. Generate image
       const result = await generateImage(prompt);
       
       if (!result.success) {
         return NextResponse.json(
           {
             code: 500,
-            msg: result.error || '图片生成失败',
+            msg: result.error || 'Image generation failed',
             data: null,
           },
           {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 5. 返回成功响应
+      // 5. Return success response
       return NextResponse.json(
         {
           code: 200,
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 处理 generate_image_with_prompt 能力（调用 Prompt Agent）
+    // 3. Handle generate_image_with_prompt capability (calls Prompt Agent)
     if (action === 'generate_image_with_prompt') {
       const { topic, style, additionalRequirements, promptAgentUrl } = body;
       
@@ -154,19 +154,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 获取 Prompt Agent URL（优先使用参数，然后环境变量，最后使用当前请求的域名自动构建）
+      // Get Prompt Agent URL (prioritize parameter, then environment variable, finally auto-build using current request domain)
       const requestUrl = new URL(request.url);
       const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       const agentUrl = promptAgentUrl || process.env.PROMPT_AGENT_URL || `${baseUrl}/api/prompt-agent`;
       
-      // 4. 为 Prompt Agent 准备支付（X-PAYMENT 机制）
-      // Prompt Agent 是付费的（0.01 BNB），需要自动支付
-      // 传入用户地址，用于给用户发放 SBT
+      // 4. Prepare payment for Prompt Agent (X-PAYMENT mechanism)
+      // Prompt Agent is paid (0.001 BNB), needs automatic payment
+      // Pass user address for SBT issuance to user
       if (!userAddress) {
         return NextResponse.json(
           {
             code: 500,
-            msg: '用户地址未提供，无法发放 SBT',
+            msg: 'User address not provided, cannot issue SBT',
             data: null,
           },
           {
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             code: 500,
-            msg: paymentPrep.error || '无法为 Prompt Agent 准备支付',
+            msg: paymentPrep.error || 'Unable to prepare payment for Prompt Agent',
             data: null,
           },
           {
@@ -192,23 +192,23 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // 使用自动支付的 X-PAYMENT
+      // Use automatically paid X-PAYMENT
       const promptAgentPayment = paymentPrep.xPayment;
       
-      // 5. 调用 Prompt Agent 生成 prompt
+      // 5. Call Prompt Agent to generate prompt
       const promptResult = await callPromptAgent(
         agentUrl,
         topic,
         style,
         additionalRequirements,
-        promptAgentPayment || undefined // 传递 X-PAYMENT 头
+        promptAgentPayment || undefined // Pass X-PAYMENT header
       );
 
       if (!promptResult.success) {
         return NextResponse.json(
           {
             code: 500,
-            msg: promptResult.error?.message || '调用 Prompt Agent 失败',
+            msg: promptResult.error?.message || 'Failed to call Prompt Agent',
             data: null,
           },
           {
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             code: 500,
-            msg: 'Prompt Agent 未返回有效的 prompt',
+            msg: 'Prompt Agent did not return a valid prompt',
             data: null,
           },
           {
@@ -232,14 +232,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 5. 使用生成的 prompt 生成图片
+      // 5. Use generated prompt to generate image
       const imageResult = await generateImage(promptResult.prompt);
       
       if (!imageResult.success) {
         return NextResponse.json(
           {
             code: 500,
-            msg: imageResult.error || '图片生成失败',
+            msg: imageResult.error || 'Image generation failed',
             data: null,
           },
           {
@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 6. 返回成功响应
+      // 6. Return success response
       return NextResponse.json(
         {
           code: 200,
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 处理 make_payment 能力
+    // 3. Handle make_payment capability
     if (action === 'make_payment') {
       const { recipient, amount, description = '', useContract = true } = body;
       
@@ -298,10 +298,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 4. 执行支付
+      // 4. Execute payment
       let result;
       if (useContract) {
-        // 使用合约支付，传入 recipient 用于发放 SBT，referrer 用于统计推广人
+        // Use contract payment, pass recipient for SBT issuance, referrer for referrer statistics
         result = await makeContractPayment(amount, description, recipient, undefined, referrer || '', 'N');
       } else {
         result = await makeDirectPayment(recipient, amount);
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             code: 500,
-            msg: result.error || '支付失败',
+            msg: result.error || 'Payment failed',
             data: null,
           },
           {
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 5. 返回成功响应
+      // 5. Return success response
       return NextResponse.json(
         {
           code: 200,
@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. 未知能力
+    // 6. Unknown capability
     return NextResponse.json(
       {
         code: 404,
@@ -352,11 +352,11 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('处理任务时发生错误:', error);
+    console.error('Error occurred while processing task:', error);
     return NextResponse.json(
       {
         code: 500,
-        msg: error instanceof Error ? error.message : '未知错误',
+        msg: error instanceof Error ? error.message : 'Unknown error',
         data: null,
       },
       {

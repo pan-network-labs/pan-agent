@@ -1,16 +1,16 @@
 /**
- * 查询 SBT 发放情况
+ * Query SBT Issuance Status
  * 
  * GET /api/sbt/query?address=0x...
  * 
- * 返回指定地址拥有的 SBT 信息
+ * Returns SBT information owned by the specified address
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import PAYMENT_SBT_ABI from '../../../../PAYMENT_SBT_ABI.json';
 
-// CORS响应头配置（允许所有来源）
+// CORS response headers configuration (allow all origins)
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -20,7 +20,7 @@ function getCorsHeaders() {
   };
 }
 
-// 辅助函数：为响应添加 CORS 头
+// Helper function: Add CORS headers to response
 function jsonResponse(data: any, init?: ResponseInit) {
   return NextResponse.json(data, {
     ...init,
@@ -31,12 +31,12 @@ function jsonResponse(data: any, init?: ResponseInit) {
   });
 }
 
-// 处理预检请求（OPTIONS）
+// Handle preflight requests (OPTIONS)
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
-// 获取支付配置
+// Get payment configuration
 function getPaymentConfig() {
   return {
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
@@ -49,20 +49,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const address = searchParams.get('address');
     const tokenId = searchParams.get('tokenId');
-    const queryType = searchParams.get('type'); // 'stats', 'list', 'detail', 或默认（全部）
+    const queryType = searchParams.get('type'); // 'stats', 'list', 'detail', or default (all)
 
-    // 根据查询类型处理不同的请求
+    // Handle different requests based on query type
     if (queryType === 'stats') {
-      // 快速统计：使用 getRarityStatsByOwner
+      // Quick statistics: use getRarityStatsByOwner
       if (!address) {
         return jsonResponse(
-          { success: false, error: '缺少 address 参数' },
+          { success: false, error: 'Missing address parameter' },
           { status: 400 }
         );
       }
       if (!ethers.isAddress(address)) {
         return jsonResponse(
-          { success: false, error: '无效的地址格式' },
+          { success: false, error: 'Invalid address format' },
           { status: 400 }
         );
       }
@@ -70,16 +70,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (queryType === 'list') {
-      // 完整列表：使用 getSBTsByAddress
+      // Complete list: use getSBTsByAddress
       if (!address) {
         return jsonResponse(
-          { success: false, error: '缺少 address 参数' },
+          { success: false, error: 'Missing address parameter' },
           { status: 400 }
         );
       }
       if (!ethers.isAddress(address)) {
         return jsonResponse(
-          { success: false, error: '无效的地址格式' },
+          { success: false, error: 'Invalid address format' },
           { status: 400 }
         );
       }
@@ -87,33 +87,33 @@ export async function GET(request: NextRequest) {
     }
 
     if (queryType === 'detail') {
-      // 单个详情：使用 getPaymentInfo
+      // Single detail: use getPaymentInfo
       if (!tokenId) {
         return jsonResponse(
-          { success: false, error: '缺少 tokenId 参数' },
+          { success: false, error: 'Missing tokenId parameter' },
           { status: 400 }
         );
       }
       return await getPaymentDetail(request, tokenId);
     }
 
-    // 默认：兼容原有查询逻辑
+    // Default: compatible with original query logic
     if (!address) {
       return jsonResponse(
         {
           success: false,
-          error: '缺少 address 参数',
+          error: 'Missing address parameter',
         },
         { status: 400 }
       );
     }
 
-    // 验证地址格式
+    // Validate address format
     if (!ethers.isAddress(address)) {
       return jsonResponse(
         {
           success: false,
-          error: '无效的地址格式',
+          error: 'Invalid address format',
         },
         { status: 400 }
       );
@@ -124,92 +124,92 @@ export async function GET(request: NextRequest) {
       return jsonResponse(
         {
           success: false,
-          error: 'PAYMENT_CONTRACT_ADDRESS 未配置',
+          error: 'PAYMENT_CONTRACT_ADDRESS not configured',
         },
         { status: 500 }
       );
     }
 
-    // 创建提供者
+    // Create provider
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
     const contract = new ethers.Contract(config.contractAddress, PAYMENT_SBT_ABI as any, provider);
 
-    // 1. 查询余额
+    // 1. Query balance
     let balance: bigint;
     try {
       balance = await contract.balanceOf(address);
     } catch (error: any) {
-      console.error('查询余额失败:', error);
+      console.error('Failed to query balance:', error);
       return jsonResponse(
         {
           success: false,
-          error: `查询余额失败: ${error?.message || '未知错误'}`,
+          error: `Failed to query balance: ${error?.message || 'Unknown error'}`,
         },
         { status: 500 }
       );
     }
 
     const balanceNumber = Number(balance);
-    console.log(`地址 ${address} 拥有 ${balanceNumber} 个 SBT`);
+    console.log(`Address ${address} owns ${balanceNumber} SBTs`);
 
-    // 2. 查询总供应量（在查询 token ID 之前，因为遍历方法需要用到）
+    // 2. Query total supply (before querying token IDs, as iteration method needs it)
     let totalSupply: bigint | null = null;
     try {
       totalSupply = await contract.totalSupply();
     } catch (error) {
-      // totalSupply 可能未实现，忽略
-      console.log('totalSupply 未实现或查询失败');
+      // totalSupply may not be implemented, ignore
+      console.log('totalSupply not implemented or query failed');
     }
 
-    // 3. 查询所有 token ID
+    // 3. Query all token IDs
     const tokenIds: string[] = [];
     const tokenURIs: string[] = [];
     const tokenDetails: Array<{ tokenId: string; tokenURI?: string }> = [];
 
     if (balanceNumber > 0) {
       try {
-        // 方法1: 使用 tokenOfOwnerByIndex（如果合约实现了 ERC721Enumerable）
+        // Method 1: Use tokenOfOwnerByIndex (if contract implements ERC721Enumerable)
         for (let i = 0; i < balanceNumber; i++) {
           try {
             const tokenId = await contract.tokenOfOwnerByIndex(address, i);
             const tokenIdString = tokenId.toString();
             tokenIds.push(tokenIdString);
 
-            // 尝试获取 token URI（可能失败，如果合约没有实现）
+            // Try to get token URI (may fail if contract doesn't implement it)
             try {
               const tokenURI = await contract.tokenURI(tokenId);
               tokenURIs.push(tokenURI);
               tokenDetails.push({ tokenId: tokenIdString, tokenURI });
             } catch {
-              // tokenURI 可能未实现或失败，忽略
+              // tokenURI may not be implemented or failed, ignore
               tokenDetails.push({ tokenId: tokenIdString });
             }
           } catch (error: any) {
-            console.error(`查询第 ${i} 个 token 失败:`, error);
-            // 继续查询下一个
+            console.error(`Failed to query token ${i}:`, error);
+            // Continue to next token
           }
         }
 
-        // 方法2: 如果 tokenOfOwnerByIndex 失败，尝试通过事件查询
+        // Method 2: If tokenOfOwnerByIndex fails, try querying through events
         if (tokenIds.length === 0 && balanceNumber > 0) {
           try {
-            // 查询 Transfer 事件（从零地址到目标地址，表示 mint）
+            // Query Transfer events (from zero address to target address, indicating mint)
             const filter = contract.filters.Transfer(null, address);
             const events = await contract.queryFilter(filter);
             
             for (const event of events) {
-              // 类型守卫：检查是否是 EventLog 类型（有 args 属性）
+              // Type guard: check if it's EventLog type (has args property)
               if ('args' in event && event.args && 'tokenId' in event.args) {
                 const eventLog = event as ethers.EventLog;
                 const tokenIdString = eventLog.args.tokenId.toString();
                 if (!tokenIds.includes(tokenIdString)) {
                   tokenIds.push(tokenIdString);
                   
-                  // 验证 token 是否仍属于该地址
+                  // Verify if token still belongs to this address
                   try {
                     const owner = await contract.ownerOf(eventLog.args.tokenId);
                     if (owner.toLowerCase() === address.toLowerCase()) {
-                      // 尝试获取 token URI
+                      // Try to get token URI
                       try {
                         const tokenURI = await contract.tokenURI(eventLog.args.tokenId);
                         tokenDetails.push({ tokenId: tokenIdString, tokenURI });
@@ -218,21 +218,21 @@ export async function GET(request: NextRequest) {
                       }
                     }
                   } catch {
-                    // ownerOf 可能失败，忽略
+                    // ownerOf may fail, ignore
                   }
                 }
               }
             }
           } catch (error: any) {
-            console.error('通过事件查询 token ID 失败:', error);
+            console.error('Failed to query token ID through events:', error);
           }
         }
 
-        // 方法3: 如果前两种方法都失败，尝试遍历所有可能的 token ID
+        // Method 3: If both previous methods fail, try iterating through all possible token IDs
         if (tokenIds.length === 0 && balanceNumber > 0 && totalSupply !== null) {
           try {
             const maxTokenId = Number(totalSupply);
-            // 从 1 开始遍历到总供应量（通常 token ID 从 1 开始）
+            // Iterate from 1 to total supply (usually token IDs start from 1)
             for (let tokenId = 1; tokenId <= maxTokenId && tokenIds.length < balanceNumber; tokenId++) {
               try {
                 const owner = await contract.ownerOf(tokenId);
@@ -240,7 +240,7 @@ export async function GET(request: NextRequest) {
                   const tokenIdString = tokenId.toString();
                   tokenIds.push(tokenIdString);
                   
-                  // 尝试获取 token URI
+                  // Try to get token URI
                   try {
                     const tokenURI = await contract.tokenURI(tokenId);
                     tokenDetails.push({ tokenId: tokenIdString, tokenURI });
@@ -249,17 +249,17 @@ export async function GET(request: NextRequest) {
                   }
                 }
               } catch {
-                // ownerOf 可能失败（token 不存在），继续下一个
+                // ownerOf may fail (token doesn't exist), continue to next
                 continue;
               }
             }
           } catch (error: any) {
-            console.error('通过遍历查询 token ID 失败:', error);
+            console.error('Failed to query token ID through iteration:', error);
           }
         }
       } catch (error: any) {
-        console.error('查询 token ID 列表失败:', error);
-        // 即使查询 token ID 失败，也返回余额信息
+        console.error('Failed to query token ID list:', error);
+        // Even if token ID query fails, still return balance information
       }
     }
 
@@ -276,24 +276,24 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('查询 SBT 时发生错误:', error);
+    console.error('Error occurred while querying SBT:', error);
     return jsonResponse(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
 }
 
-// 快速统计：使用 getRarityStatsByOwner（支持 N、R、S 三个级别）
+// Quick statistics: use getRarityStatsByOwner (supports N, R, S three levels)
 async function getRarityStats(request: NextRequest, address: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
       return jsonResponse(
-        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
+        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS not configured' },
         { status: 500 }
       );
     }
@@ -302,91 +302,91 @@ async function getRarityStats(request: NextRequest, address: string) {
     const contract = new ethers.Contract(config.contractAddress, PAYMENT_SBT_ABI as any, provider);
 
     try {
-      // 直接调用合约的 getRarityStatsByOwner 方法
-      // 合约方法签名：getRarityStatsByOwner(address user) returns (uint256 nCount, uint256 rCount, uint256 sCount, uint256 totalCount)
-      // 根据 ABI，返回值为命名元组，ethers.js 会将其解析为对象或数组
+      // Directly call contract's getRarityStatsByOwner method
+      // Contract method signature: getRarityStatsByOwner(address user) returns (uint256 nCount, uint256 rCount, uint256 sCount, uint256 totalCount)
+      // According to ABI, return value is a named tuple, ethers.js will parse it as object or array
       const result = await contract.getRarityStatsByOwner(address);
       
-      // 处理返回结果（ethers.js v6 可能返回数组或对象，取决于 ABI 定义）
+      // Process return result (ethers.js v6 may return array or object, depending on ABI definition)
       let nCount: string;
       let rCount: string;
       let sCount: string;
       let totalCount: string;
       
-      // 优先尝试按命名属性访问（如果 ABI 中有命名）
+      // Prioritize accessing by named properties (if ABI has names)
       if (result && typeof result === 'object') {
         if ('nCount' in result && 'rCount' in result && 'sCount' in result && 'totalCount' in result) {
-          // 对象格式：{ nCount, rCount, sCount, totalCount }
+          // Object format: { nCount, rCount, sCount, totalCount }
           nCount = result.nCount.toString();
           rCount = result.rCount.toString();
           sCount = result.sCount.toString();
           totalCount = result.totalCount.toString();
         } else if (Array.isArray(result) && result.length >= 4) {
-          // 数组格式：[nCount, rCount, sCount, totalCount]
+          // Array format: [nCount, rCount, sCount, totalCount]
           nCount = result[0].toString();
           rCount = result[1].toString();
           sCount = result[2].toString();
           totalCount = result[3].toString();
         } else if (result.length !== undefined && result.length >= 4) {
-          // 类数组对象（ethers.js 的特殊格式）
+          // Array-like object (ethers.js special format)
           nCount = result[0]?.toString() || '0';
           rCount = result[1]?.toString() || '0';
           sCount = result[2]?.toString() || '0';
           totalCount = result[3]?.toString() || '0';
         } else {
-          throw new Error('无法解析合约返回的统计结果格式');
+          throw new Error('Unable to parse contract return statistics result format');
         }
       } else {
-        throw new Error('合约返回的结果格式不正确');
+        throw new Error('Contract return result format is incorrect');
       }
       
-      console.log('✅ 成功调用合约 getRarityStatsByOwner 方法');
-      console.log('  - 原始返回结果类型:', typeof result, Array.isArray(result) ? '(数组)' : '(对象)');
-      console.log('  - N级数量:', nCount);
-      console.log('  - R级数量:', rCount);
-      console.log('  - S级数量:', sCount);
-      console.log('  - 总数量:', totalCount);
+      console.log('✅ Successfully called contract getRarityStatsByOwner method');
+      console.log('  - Original return result type:', typeof result, Array.isArray(result) ? '(array)' : '(object)');
+      console.log('  - N level count:', nCount);
+      console.log('  - R level count:', rCount);
+      console.log('  - S level count:', sCount);
+      console.log('  - Total count:', totalCount);
       
       return jsonResponse({
         success: true,
         data: {
           address,
-          nCount, // N级（普通）数量
-          rCount, // R级（稀有）数量
-          sCount, // S级（超级稀有）数量
-          totalCount, // 总数量
+          nCount, // N level (Normal) count
+          rCount, // R level (Rare) count
+          sCount, // S level (Super Rare) count
+          totalCount, // Total count
           contractAddress: config.contractAddress,
         },
       });
     } catch (error: any) {
-      console.error('查询统计信息失败:', error);
+      console.error('Failed to query statistics:', error);
       return jsonResponse(
         {
           success: false,
-          error: `查询统计信息失败: ${error?.message || '未知错误'}`,
+          error: `Failed to query statistics: ${error?.message || 'Unknown error'}`,
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('查询统计信息时发生错误:', error);
+    console.error('Error occurred while querying statistics:', error);
     return jsonResponse(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
 }
 
-// 完整列表：使用 getSBTsByAddress
+// Complete list: use getSBTsByAddress
 async function getSBTsList(request: NextRequest, address: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
       return jsonResponse(
-        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
+        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS not configured' },
         { status: 500 }
       );
     }
@@ -399,7 +399,7 @@ async function getSBTsList(request: NextRequest, address: string) {
       const tokenIds = result.tokenIds || result[0] || [];
       const paymentInfos = result.paymentInfos || result[1] || [];
       
-      // 转换数据格式
+      // Convert data format
       const formattedList = tokenIds.map((tokenId: bigint, index: number) => {
         const info = paymentInfos[index] || {};
         const amount = info.amount || BigInt(0);
@@ -430,42 +430,42 @@ async function getSBTsList(request: NextRequest, address: string) {
         },
       });
     } catch (error: any) {
-      console.error('查询 SBT 列表失败:', error);
+      console.error('Failed to query SBT list:', error);
       return jsonResponse(
         {
           success: false,
-          error: `查询 SBT 列表失败: ${error?.message || '未知错误'}`,
+          error: `Failed to query SBT list: ${error?.message || 'Unknown error'}`,
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('查询 SBT 列表时发生错误:', error);
+    console.error('Error occurred while querying SBT list:', error);
     return jsonResponse(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
 }
 
-// 单个详情：使用 getPaymentInfo
+// Single detail: use getPaymentInfo
 async function getPaymentDetail(request: NextRequest, tokenId: string) {
   try {
     const config = getPaymentConfig();
     if (!config.contractAddress) {
       return jsonResponse(
-        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS 未配置' },
+        { success: false, error: 'PAYMENT_CONTRACT_ADDRESS not configured' },
         { status: 500 }
       );
     }
 
-    // 验证 tokenId 格式
+    // Validate tokenId format
     if (!/^\d+$/.test(tokenId)) {
       return jsonResponse(
-        { success: false, error: '无效的 tokenId 格式' },
+        { success: false, error: 'Invalid tokenId format' },
         { status: 400 }
       );
     }
@@ -497,21 +497,21 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
         },
       });
     } catch (error: any) {
-      console.error('查询支付详情失败:', error);
+      console.error('Failed to query payment details:', error);
       return jsonResponse(
         {
           success: false,
-          error: `查询支付详情失败: ${error?.message || '未知错误'}`,
+          error: `Failed to query payment details: ${error?.message || 'Unknown error'}`,
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('查询支付详情时发生错误:', error);
+    console.error('Error occurred while querying payment details:', error);
     return jsonResponse(
       {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

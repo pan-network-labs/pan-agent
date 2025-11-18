@@ -1,11 +1,11 @@
 /**
- * 支付工具函数
- * 用于 Agent 调用智能合约进行支付
+ * Payment Utility Functions
+ * For Agents to call smart contracts for payment
  */
 
 import { ethers } from 'ethers';
 
-// 支付配置
+// Payment configuration
 export interface PaymentConfig {
   rpcUrl: string;
   contractAddress: string;
@@ -13,7 +13,7 @@ export interface PaymentConfig {
   broadcastServiceUrl: string;
 }
 
-// 获取支付配置
+// Get payment configuration
 export function getPaymentConfig(): PaymentConfig {
   return {
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
@@ -23,7 +23,7 @@ export function getPaymentConfig(): PaymentConfig {
   };
 }
 
-// 调用智能合约支付（使用签名服务）
+// Call smart contract payment (using signing service)
 export async function makeContractPayment(
   recipient: string,
   amount: string,
@@ -36,7 +36,7 @@ export async function makeContractPayment(
       return { success: false, error: 'Payment contract address not configured' };
     }
 
-    // 1. 准备智能合约调用数据
+    // 1. Prepare smart contract call data
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
     const iface = new ethers.Interface([
       'function makePayment(address recipient, string memory description) payable returns (uint256 tokenId)'
@@ -45,9 +45,9 @@ export async function makeContractPayment(
     const data = iface.encodeFunctionData('makePayment', [recipient, description]);
     const value = ethers.parseEther(amount);
 
-    // 2. 获取当前 nonce
-    // 注意：这里需要知道签名服务的钱包地址
-    // 可以从签名服务获取，或者从环境变量读取
+    // 2. Get current nonce
+    // Note: Need to know the signing service wallet address
+    // Can get from signing service, or read from environment variables
     const signingWalletAddress = process.env.SIGNING_WALLET_ADDRESS;
     if (!signingWalletAddress) {
       return { success: false, error: 'Signing wallet address not configured' };
@@ -55,7 +55,7 @@ export async function makeContractPayment(
     
     const nonce = await provider.getTransactionCount(signingWalletAddress, 'pending');
     
-    // 3. 估算 gas
+    // 3. Estimate gas
     const gasEstimate = await provider.estimateGas({
       to: config.contractAddress,
       value,
@@ -64,12 +64,12 @@ export async function makeContractPayment(
     
     const gasPrice = await provider.getFeeData();
     
-    // 4. 调用签名服务
+    // 4. Call signing service
     const signResponse = await fetch(config.signingServiceUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // 可以添加 API Key 认证
+        // Can add API Key authentication
         // 'Authorization': `Bearer ${process.env.SIGNING_SERVICE_API_KEY}`,
       },
       body: JSON.stringify({
@@ -93,7 +93,7 @@ export async function makeContractPayment(
       return { success: false, error: signResult.error || 'Signing failed' };
     }
 
-    // 5. 广播交易
+    // 5. Broadcast transaction
     const broadcastResponse = await fetch(config.broadcastServiceUrl, {
       method: 'POST',
       headers: {
@@ -116,7 +116,7 @@ export async function makeContractPayment(
       txHash: broadcastResult.transactionHash,
     };
   } catch (error) {
-    console.error('调用智能合约支付时发生错误:', error);
+    console.error('Error occurred while calling smart contract payment:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -124,7 +124,7 @@ export async function makeContractPayment(
   }
 }
 
-// 直接转账（使用签名服务）
+// Direct transfer (using signing service)
 export async function makeDirectPayment(
   recipient: string,
   amount: string
@@ -142,7 +142,7 @@ export async function makeDirectPayment(
     const nonce = await provider.getTransactionCount(signingWalletAddress, 'pending');
     const gasPrice = await provider.getFeeData();
     
-    // 调用签名服务
+    // Call signing service
     const signResponse = await fetch(config.signingServiceUrl, {
       method: 'POST',
       headers: {
@@ -167,7 +167,7 @@ export async function makeDirectPayment(
       return { success: false, error: signResult.error || 'Signing failed' };
     }
 
-    // 广播交易
+    // Broadcast transaction
     const broadcastResponse = await fetch(config.broadcastServiceUrl, {
       method: 'POST',
       headers: {
@@ -190,7 +190,7 @@ export async function makeDirectPayment(
       txHash: broadcastResult.transactionHash,
     };
   } catch (error) {
-    console.error('直接转账时发生错误:', error);
+    console.error('Error occurred while making direct transfer:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

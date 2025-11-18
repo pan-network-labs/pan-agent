@@ -1,21 +1,21 @@
 /**
- * 支付签名服务端点
+ * Payment Signing Service Endpoint
  * 
- * 这是一个独立的签名服务，用于安全地签名支付交易
- * 私钥存储在环境变量或更安全的位置（如 HSM、密钥管理服务）
+ * This is an independent signing service for securely signing payment transactions
+ * Private keys are stored in environment variables or more secure locations (e.g., HSM, key management services)
  * 
- * 安全建议：
- * 1. 使用环境变量存储私钥（生产环境使用密钥管理服务）
- * 2. 添加 IP 白名单
- * 3. 添加请求频率限制
- * 4. 添加请求签名验证
- * 5. 记录所有签名请求
+ * Security Recommendations:
+ * 1. Use environment variables to store private keys (use key management services in production)
+ * 2. Add IP whitelist
+ * 3. Add request rate limiting
+ * 4. Add request signature verification
+ * 5. Log all signing requests
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 
-// CORS响应头配置
+// CORS response headers configuration
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -25,23 +25,23 @@ function getCorsHeaders() {
   };
 }
 
-// 验证请求来源（可选，增强安全性）
+// Validate request source (optional, enhance security)
 function validateRequest(request: NextRequest): boolean {
-  // 可以添加 IP 白名单检查
+  // Can add IP whitelist check
   // const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
   // return allowedIPs.includes(clientIp);
   
-  // 可以添加 API Key 验证
+  // Can add API Key verification
   // const apiKey = request.headers.get('Authorization');
   // return validateApiKey(apiKey);
   
-  return true; // 简化版本，生产环境应该添加验证
+  return true; // Simplified version, production environment should add verification
 }
 
-// POST /api/payment/sign - 签名支付交易
+// POST /api/payment/sign - Sign payment transaction
 export async function POST(request: NextRequest) {
   try {
-    // 1. 验证请求
+    // 1. Validate request
     if (!validateRequest(request)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 解析请求体
+    // 2. Parse request body
     const body = await request.json();
     const { to, value, data, nonce, gasPrice, gasLimit } = body;
 
-    // 3. 验证必需参数
+    // 3. Validate required parameters
     if (!to || !value) {
       return NextResponse.json(
         { error: 'Missing required parameters: to, value' },
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. 获取私钥（从环境变量，生产环境应使用密钥管理服务）
+    // 4. Get private key (from environment variables, production environment should use key management services)
     const privateKey = process.env.PAYMENT_PRIVATE_KEY;
     if (!privateKey) {
       console.error('PAYMENT_PRIVATE_KEY not configured');
@@ -71,26 +71,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. 创建钱包和提供者
+    // 5. Create wallet and provider
     const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const wallet = new ethers.Wallet(privateKey, provider);
 
-    // 6. 构建交易
+    // 6. Build transaction
     const tx: ethers.TransactionRequest = {
       to,
       value: ethers.parseEther(value.toString()),
       data: data || '0x',
     };
 
-    // 如果提供了 nonce，使用它；否则自动获取
+    // If nonce is provided, use it; otherwise get automatically
     if (nonce !== undefined) {
       tx.nonce = nonce;
     } else {
       tx.nonce = await provider.getTransactionCount(wallet.address);
     }
 
-    // 如果提供了 gas 参数，使用它们；否则自动估算
+    // If gas parameters are provided, use them; otherwise estimate automatically
     if (gasPrice) {
       tx.gasPrice = ethers.parseUnits(gasPrice.toString(), 'gwei');
     }
@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
       tx.gasLimit = BigInt(gasLimit);
     }
 
-    // 7. 签名交易
+    // 7. Sign transaction
     const signedTx = await wallet.signTransaction(tx);
     
-    // 8. 记录签名操作（用于审计）
+    // 8. Log signing operation (for auditing)
     console.log('Transaction signed:', {
       from: wallet.address,
       to,
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
-    // 9. 返回签名后的交易
+    // 9. Return signed transaction
     return NextResponse.json(
       {
         success: true,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       { headers: getCorsHeaders() }
     );
   } catch (error) {
-    console.error('签名交易时发生错误:', error);
+    console.error('Error occurred while signing transaction:', error);
     return NextResponse.json(
       {
         error: 'Failed to sign transaction',
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 处理预检请求
+// Handle preflight requests
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }

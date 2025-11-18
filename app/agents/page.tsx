@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getLocale, useTranslations, type Locale } from '../lib/i18n';
 
 interface AgentCard {
   '@context'?: string;
@@ -16,7 +17,7 @@ interface AgentCard {
   payment?: {
     required: boolean;
     defaultPrice?: string;
-    price?: string; // 向后兼容
+    price?: string; // Backward compatibility
     currency: string;
     network: string;
     address?: string;
@@ -56,6 +57,14 @@ interface AgentInfo {
 }
 
 export default function AgentsPage() {
+  const [currentLocale, setCurrentLocale] = useState<Locale>(() => {
+    if (typeof window !== 'undefined') {
+      return getLocale();
+    }
+    return 'en';
+  });
+  const { t } = useTranslations(currentLocale);
+
   const [agents, setAgents] = useState<AgentInfo[]>([
     {
       url: '/api/a2a-agent',
@@ -72,7 +81,7 @@ export default function AgentsPage() {
   ]);
 
   useEffect(() => {
-    // 加载所有 Agent 的卡片信息
+    // Load all Agent card information
     agents.forEach((agent, index) => {
       loadAgentCard(agent.url, index);
     });
@@ -86,7 +95,7 @@ export default function AgentsPage() {
     });
 
     try {
-      // 使用 A2A 协议标准路径 /.well-known/agent.json
+      // Use A2A protocol standard path /.well-known/agent.json
       const response = await fetch(`${url}/.well-known/agent.json`);
       
       if (!response.ok) {
@@ -105,7 +114,7 @@ export default function AgentsPage() {
         updated[index] = {
           ...updated[index],
           loading: false,
-          error: error instanceof Error ? error.message : '加载失败',
+          error: error instanceof Error ? error.message : 'Failed to load',
         };
         return updated;
       });
@@ -117,7 +126,7 @@ export default function AgentsPage() {
     
     const props = Object.entries(schema.properties)
       .map(([key, value]: [string, any]) => {
-        const required = schema.required?.includes(key) ? ' (必需)' : ' (可选)';
+        const required = schema.required?.includes(key) ? ' (required)' : ' (optional)';
         return `${key}: ${value.type || 'any'}${required}`;
       })
       .join(', ');
@@ -127,7 +136,7 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      {/* 导航栏 */}
+      {/* Navigation bar */}
       <nav className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -141,7 +150,7 @@ export default function AgentsPage() {
                 href="/"
                 className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 px-3 py-2 rounded-md text-sm font-medium"
               >
-                图片生成
+                {t('agents.imageGeneration')}
               </a>
               <a
                 href="/agents"
@@ -158,10 +167,10 @@ export default function AgentsPage() {
         <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-            A2A Agents 可视化
+            {t('agents.title')}
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            展示所有符合 Google A2A 协议的 Agent 信息
+            {t('agents.description')}
           </p>
         </div>
 
@@ -176,7 +185,7 @@ export default function AgentsPage() {
                   {agent.card?.name || agent.url}
                 </h2>
                 {agent.loading && (
-                  <span className="text-sm text-zinc-500">加载中...</span>
+                  <span className="text-sm text-zinc-500">{t('agents.loading')}</span>
                 )}
                 {agent.error && (
                   <span className="text-sm text-red-500">{agent.error}</span>
@@ -185,27 +194,27 @@ export default function AgentsPage() {
 
               {agent.card ? (
                 <>
-                  {/* 基本信息 */}
+                  {/* Basic Information */}
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                      基本信息
+                      {t('agents.basicInfo')}
                     </h3>
                     <div className="space-y-2 text-sm">
                       <div>
-                        <span className="text-zinc-600 dark:text-zinc-400">描述：</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">{t('agents.description')}：</span>
                         <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                           {agent.card.description}
                         </span>
                       </div>
                       <div>
-                        <span className="text-zinc-600 dark:text-zinc-400">版本：</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">{t('agents.version')}：</span>
                         <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                           {agent.card.version}
                         </span>
                       </div>
                       {agent.card['@type'] && (
                         <div>
-                          <span className="text-zinc-600 dark:text-zinc-400">类型：</span>
+                          <span className="text-zinc-600 dark:text-zinc-400">{t('agents.type')}：</span>
                           <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                             {agent.card['@type']}
                           </span>
@@ -214,10 +223,10 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  {/* 端点信息 */}
+                  {/* Endpoints */}
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                      端点
+                      {t('agents.endpoints')}
                     </h3>
                     <div className="space-y-2 text-sm">
                       <div>
@@ -235,10 +244,10 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  {/* 能力列表 */}
+                  {/* Capabilities */}
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
-                      能力 ({agent.card.capabilities.length})
+                      {t('agents.capabilities')} ({agent.card.capabilities.length})
                     </h3>
                     <div className="space-y-4">
                       {agent.card.capabilities.map((capability, capIndex) => (
@@ -259,7 +268,7 @@ export default function AgentsPage() {
                               <div className="ml-4 text-right">
                                 <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                   {capability.pricing.price === '0' ? (
-                                    <span className="text-green-600 dark:text-green-400">免费</span>
+                                    <span className="text-green-600 dark:text-green-400">{t('agents.free')}</span>
                                   ) : (
                                     <span>
                                       {capability.pricing.price} {capability.pricing.currency}
@@ -278,7 +287,7 @@ export default function AgentsPage() {
                           <div className="space-y-2 text-xs">
                             <div>
                               <span className="text-zinc-600 dark:text-zinc-400 font-medium">
-                                输入参数：
+                                {t('agents.inputParams')}：
                               </span>
                               <div className="mt-1 p-2 bg-zinc-50 dark:bg-zinc-800 rounded">
                                 <code className="text-zinc-900 dark:text-zinc-100">
@@ -288,7 +297,7 @@ export default function AgentsPage() {
                             </div>
                             <div>
                               <span className="text-zinc-600 dark:text-zinc-400 font-medium">
-                                输出参数：
+                                {t('agents.outputParams')}：
                               </span>
                               <div className="mt-1 p-2 bg-zinc-50 dark:bg-zinc-800 rounded">
                                 <code className="text-zinc-900 dark:text-zinc-100">
@@ -302,22 +311,22 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  {/* 支付信息 */}
+                  {/* Payment Information */}
                   {agent.card.payment && (
                     <div className="mb-6">
                       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                        支付信息
+                        {t('agents.paymentInfo')}
                       </h3>
                       <div className="space-y-2 text-sm">
                         <div>
-                          <span className="text-zinc-600 dark:text-zinc-400">是否必需：</span>
+                          <span className="text-zinc-600 dark:text-zinc-400">{t('agents.required')}：</span>
                           <span className="text-zinc-900 dark:text-zinc-100 ml-2">
-                            {agent.card.payment.required ? '是' : '否'}
+                            {agent.card.payment.required ? t('agents.yes') : t('agents.no')}
                           </span>
                         </div>
                         {(agent.card.payment.defaultPrice || agent.card.payment.price) && (
                           <div>
-                            <span className="text-zinc-600 dark:text-zinc-400">默认价格：</span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{t('agents.defaultPrice')}：</span>
                             <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                               {agent.card.payment.defaultPrice || agent.card.payment.price} {agent.card.payment.currency}
                             </span>
@@ -325,21 +334,21 @@ export default function AgentsPage() {
                         )}
                         {agent.card.payment.minAmount && (
                           <div>
-                            <span className="text-zinc-600 dark:text-zinc-400">最小金额：</span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{t('agents.minAmount')}：</span>
                             <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                               {agent.card.payment.minAmount} {agent.card.payment.currency}
                             </span>
                           </div>
                         )}
                         <div>
-                          <span className="text-zinc-600 dark:text-zinc-400">网络：</span>
+                          <span className="text-zinc-600 dark:text-zinc-400">{t('agents.network')}：</span>
                           <span className="text-zinc-900 dark:text-zinc-100 ml-2">
                             {agent.card.payment.network}
                           </span>
                         </div>
                         {agent.card.payment.address && (
                           <div>
-                            <span className="text-zinc-600 dark:text-zinc-400">地址：</span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{t('agents.address')}：</span>
                             <code className="ml-2 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs">
                               {agent.card.payment.address}
                             </code>
@@ -347,10 +356,10 @@ export default function AgentsPage() {
                         )}
                         {agent.card.payment.pricingModel && (
                           <div>
-                            <span className="text-zinc-600 dark:text-zinc-400">定价模式：</span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{t('agents.pricingModel')}：</span>
                             <span className="text-zinc-900 dark:text-zinc-100 ml-2">
-                              {agent.card.payment.pricingModel === 'per_call' ? '按次计费' : 
-                               agent.card.payment.pricingModel === 'free' ? '免费' : 
+                              {agent.card.payment.pricingModel === 'per_call' ? t('agents.perCall') : 
+                               agent.card.payment.pricingModel === 'free' ? t('agents.free') : 
                                agent.card.payment.pricingModel}
                             </span>
                           </div>
@@ -364,11 +373,11 @@ export default function AgentsPage() {
                     </div>
                   )}
 
-                  {/* 元数据 */}
+                  {/* Metadata */}
                   {agent.card.metadata && (
                     <div>
                       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-                        元数据
+                        {t('agents.metadata')}
                       </h3>
                       <div className="text-sm">
                         <pre className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded overflow-x-auto text-xs">
@@ -380,29 +389,29 @@ export default function AgentsPage() {
                 </>
               ) : (
                 <div className="text-center py-8 text-zinc-500">
-                  {agent.loading ? '加载中...' : agent.error || '暂无数据'}
+                  {agent.loading ? t('agents.loading') : agent.error || t('agents.noData')}
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {/* A2A 协议信息 */}
+        {/* A2A Protocol Information */}
         <div className="mt-8 bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6 border border-zinc-200 dark:border-zinc-800">
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-            关于 A2A 协议
+            {t('agents.aboutA2A')}
           </h2>
           <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
             <p>
               <strong className="text-zinc-900 dark:text-zinc-100">A2A (Agent-to-Agent)</strong>{' '}
-              是 Google 开发的开放协议，用于实现不同 AI 代理之间的互操作性和协作。
+              {t('agents.aboutA2ADesc1')}
             </p>
             <p>
-              所有 Agent 都符合 <strong className="text-zinc-900 dark:text-zinc-100">JSON-RPC 2.0</strong>{' '}
-              消息格式，可以通过标准化的接口进行通信和协作。
+              {t('agents.aboutA2ADesc2')}{' '}
+              <strong className="text-zinc-900 dark:text-zinc-100">JSON-RPC 2.0</strong>.
             </p>
             <p>
-              了解更多：{' '}
+              {t('agents.learnMore')}{' '}
               <a
                 href="https://a2a.plus"
                 target="_blank"

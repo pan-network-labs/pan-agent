@@ -1,6 +1,6 @@
 /**
- * 多语言支持工具
- * 支持英文（en）和繁体中文（zh-TW）
+ * Multi-language support utility
+ * Supports English (en) and Traditional Chinese (zh-TW)
  */
 
 import React from 'react';
@@ -10,20 +10,20 @@ export type Locale = 'en' | 'zh-TW';
 export const defaultLocale: Locale = 'en';
 export const locales: Locale[] = ['en', 'zh-TW'];
 
-// 语言显示名称
+// Language display names
 export const localeNames: Record<Locale, string> = {
   'en': 'English',
   'zh-TW': '繁體中文',
 };
 
-// 加载语言文件
+// Load language file
 async function loadLocale(locale: Locale): Promise<Record<string, any>> {
   try {
     const module = await import(`../locales/${locale}.json`);
     return module.default || module;
   } catch (error) {
     console.error(`Failed to load locale ${locale}:`, error);
-    // 如果加载失败，尝试加载默认语言
+    // If loading fails, try to load default language
     if (locale !== defaultLocale) {
       try {
         const module = await import(`../locales/${defaultLocale}.json`);
@@ -36,43 +36,43 @@ async function loadLocale(locale: Locale): Promise<Record<string, any>> {
   }
 }
 
-// 获取当前语言（从 localStorage 或浏览器语言）
+// Get current language (from localStorage or browser language)
 export function getLocale(): Locale {
   if (typeof window === 'undefined') {
     return defaultLocale;
   }
 
-  // 从 localStorage 读取
+  // Read from localStorage
   const saved = localStorage.getItem('locale') as Locale;
   if (saved && locales.includes(saved)) {
     return saved;
   }
 
-  // 从浏览器语言检测
+  // Detect from browser language
   const browserLang = navigator.language || (navigator as any).userLanguage;
   if (browserLang.startsWith('zh')) {
-    // 如果是中文，检查是否是繁体
+    // If it's Chinese, check if it's Traditional
     if (browserLang.includes('TW') || browserLang.includes('HK')) {
       return 'zh-TW';
     }
-    // 简体中文也使用繁体（如果没有简体版本）
+    // Simplified Chinese also uses Traditional (if no Simplified version available)
     return 'zh-TW';
   }
 
   return defaultLocale;
 }
 
-// 设置语言
+// Set language
 export function setLocale(locale: Locale) {
   if (typeof window === 'undefined') {
     return;
   }
   localStorage.setItem('locale', locale);
-  // 触发自定义事件，通知组件更新
+  // Trigger custom event to notify components to update
   window.dispatchEvent(new CustomEvent('localechange', { detail: locale }));
 }
 
-// 翻译函数（同步版本，需要预先加载）
+// Translation function (synchronous version, requires pre-loading)
 export function t(
   translations: Record<string, any>,
   key: string,
@@ -85,7 +85,7 @@ export function t(
     if (value && typeof value === 'object' && k in value) {
       value = value[k];
     } else {
-      // 如果找不到翻译，返回 key
+      // If translation not found, return key
       return key;
     }
   }
@@ -94,7 +94,7 @@ export function t(
     return key;
   }
 
-  // 替换参数
+  // Replace parameters
   if (params) {
     return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
       return params[paramKey]?.toString() || match;
@@ -104,7 +104,7 @@ export function t(
   return value;
 }
 
-// React Hook 用于在组件中使用翻译
+// React Hook for using translations in components
 export function useTranslations(locale: Locale) {
   const [translations, setTranslations] = React.useState<Record<string, any>>({});
   const [loading, setLoading] = React.useState(true);
@@ -123,7 +123,7 @@ export function useTranslations(locale: Locale) {
 
     load();
 
-    // 监听语言变化
+    // Listen for language changes
     const handleLocaleChange = (event: any) => {
       const newLocale = event.detail || getLocale();
       setCurrentLocale(newLocale);

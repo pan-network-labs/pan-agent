@@ -39,7 +39,7 @@
   "payment": {
     "required": "需要支付",
     "amount": "金額",
-    "network": "網絡",
+    "network": "網路",
     "recipient": "收款地址",
     "weiFormat": "Wei 格式",
     "connectAndPay": "連接錢包並支付",
@@ -55,14 +55,47 @@
     "insufficientAmount": "交易金額不足",
     "transactionFailed": "交易失敗",
     "transactionNotConfirmed": "交易尚未確認",
-    "transactionNotFound": "交易不存在"
+    "transactionNotFound": "交易不存在",
+    "view402Response": "查看 402 響應數據格式",
+    "view402ResponseDesc": "這是從伺服器接收到的完整 402 響應數據（x402 標準格式）："
   },
   "errors": {
     "unknown": "未知錯誤",
-    "networkError": "網絡錯誤",
+    "networkError": "網路錯誤",
     "userRejected": "用戶拒絕了請求",
     "insufficientFunds": "餘額不足",
     "transactionRejected": "用戶拒絕了交易請求"
+  },
+  "agents": {
+    "title": "A2A Agents 可視化",
+    "description": "展示所有符合 Google A2A 協議的 Agent 資訊",
+    "imageGeneration": "圖片生成",
+    "loading": "載入中...",
+    "noData": "暫無數據",
+    "basicInfo": "基本資訊",
+    "description": "描述",
+    "version": "版本",
+    "type": "類型",
+    "endpoints": "端點",
+    "capabilities": "能力",
+    "inputParams": "輸入參數",
+    "outputParams": "輸出參數",
+    "paymentInfo": "支付資訊",
+    "required": "是否必需",
+    "yes": "是",
+    "no": "否",
+    "defaultPrice": "默認價格",
+    "minAmount": "最小金額",
+    "network": "網路",
+    "address": "地址",
+    "pricingModel": "定價模式",
+    "perCall": "按次計費",
+    "free": "免費",
+    "metadata": "元數據",
+    "aboutA2A": "關於 A2A 協議",
+    "aboutA2ADesc1": "A2A (Agent-to-Agent) 是 Google 開發的開放協議，用於實現不同 AI 代理之間的互操作性和協作。",
+    "aboutA2ADesc2": "所有 Agent 都符合 JSON-RPC 2.0 消息格式，可以通過標準化的介面進行通信和協作。",
+    "learnMore": "了解更多："
   }
 }
 

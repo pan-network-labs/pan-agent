@@ -1,10 +1,10 @@
 /**
- * A2A Agent 共享工具函数
+ * A2A Agent Shared Utility Functions
  */
 
 import { ethers } from 'ethers';
 
-// CORS响应头配置
+// CORS response headers configuration
 export function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -14,14 +14,14 @@ export function getCorsHeaders() {
   };
 }
 
-// 获取支付验证配置（从环境变量）
+// Get payment validation configuration (from environment variables)
 export function getPaymentConfig() {
-  // Generate Agent 价格从环境变量读取，环境变量应该是 Wei 格式（字符串）
-  // 默认 0.005 BNB = 5000000000000000 Wei
+  // Generate Agent price read from environment variables, should be in Wei format (string)
+  // Default 0.005 BNB = 5000000000000000 Wei
   const priceEnv = process.env.PAYMENT_PRICE || '5000000000000000';
   const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '5000000000000000';
   
-  // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
+  // Determine if BNB format or Wei format (BNB format usually < 1e15, Wei format usually > 1e15)
   const priceWei = parseFloat(priceEnv) < 1e15 
     ? ethers.parseEther(priceEnv).toString() 
     : priceEnv;
@@ -30,35 +30,35 @@ export function getPaymentConfig() {
     : minAmountEnv;
   
   // ============================================================================
-  // 【重要】A2A Agent 收款地址配置说明：
+  // 【Important】A2A Agent Payment Address Configuration:
   // ============================================================================
-  // PAYMENT_ADDRESS: 普通钱包地址（用于 A2A Agent）
-  //   - 用途：用户支付给 A2A Agent 的收款地址（直接转账，不通过合约）
-  //   - 功能：仅接收转账，不发放 SBT
-  //   - 说明：A2A Agent 使用普通钱包地址，不使用智能合约
-  //   - 示例：0x74cc09316deab81ee874839e1da9e84ec066369c
+  // PAYMENT_ADDRESS: Regular wallet address (for A2A Agent)
+  //   - Purpose: Address for user to pay A2A Agent (direct transfer, not through contract)
+  //   - Function: Only receive transfer, do not issue SBT
+  //   - Note: A2A Agent uses regular wallet address, does not use smart contract
+  //   - Example: 0x74cc09316deab81ee874839e1da9e84ec066369c
   //
-  // 注意：A2A Agent 不使用 PAYMENT_CONTRACT_ADDRESS（智能合约地址）
+  // Note: A2A Agent does not use PAYMENT_CONTRACT_ADDRESS (smart contract address)
   // ============================================================================
   const paymentAddress = process.env.PAYMENT_ADDRESS || '0x74cc09316deab81ee874839e1da9e84ec066369c';
   
-  // 记录使用的地址（用于调试）
-  console.log(`📋 A2A Agent 收款地址配置: PAYMENT_ADDRESS（普通钱包）`);
-  console.log(`   地址: ${paymentAddress}`);
+  // Log address used (for debugging)
+  console.log(`📋 A2A Agent payment address configuration: PAYMENT_ADDRESS (regular wallet)`);
+  console.log(`   Address: ${paymentAddress}`);
   
   const config = {
-    price: priceWei, // Wei 格式
+    price: priceWei, // Wei format
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
     network: process.env.PAYMENT_NETWORK || 'BSCTest',
     address: paymentAddress,
-    minAmount: minAmountWei, // Wei 格式
+    minAmount: minAmountWei, // Wei format
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };
 
   return config;
 }
 
-// 验证支付信息
+// Validate payment information
 export async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: boolean; userAddress?: string; error?: any }> {
   const PAYMENT_CONFIG = getPaymentConfig();
 
@@ -80,62 +80,62 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     const tx = await provider.getTransaction(tsHash);
     
     if (!tx) {
-      return { valid: false, error: '交易不存在' };
+      return { valid: false, error: 'Transaction does not exist' };
     }
 
     const receipt = await provider.getTransactionReceipt(tsHash);
     if (!receipt) {
-      return { valid: false, error: '交易尚未确认' };
+      return { valid: false, error: 'Transaction not yet confirmed' };
     }
 
-    console.log('交易信息:');
-    console.log('交易哈希:', tsHash);
-    console.log('发送方:', tx.from);
-    console.log('接收方（合约地址）:', tx.to);
-    console.log('交易金额:', ethers.formatEther(tx.value), 'BNB');
-    console.log('交易状态:', receipt.status === 1 ? '成功' : '失败');
+    console.log('Transaction information:');
+    console.log('Transaction hash:', tsHash);
+    console.log('Sender:', tx.from);
+    console.log('Recipient (contract address):', tx.to);
+    console.log('Transaction amount:', ethers.formatEther(tx.value), 'BNB');
+    console.log('Transaction status:', receipt.status === 1 ? 'Success' : 'Failed');
 
-    // 验证收款地址和金额（使用 Wei 格式比较）
+    // Validate recipient address and amount (compare using Wei format)
     const expectedAddress = PAYMENT_CONFIG.address.toLowerCase();
     const amountWei = BigInt(tx.value.toString());
     const minAmountWei = BigInt(PAYMENT_CONFIG.minAmount);
 
-    // 验证交易的 to 地址（支持直接支付和智能合约支付）
-    // 直接支付：to 地址是 PAYMENT_ADDRESS
-    // 智能合约支付：to 地址是合约地址（合约直接收款，不再需要 recipient 参数）
+    // Validate transaction to address (supports direct payment and smart contract payment)
+    // Direct payment: to address is PAYMENT_ADDRESS
+    // Smart contract payment: to address is contract address (contract directly receives payment, no longer needs recipient parameter)
     const toAddress = tx.to?.toLowerCase();
     const isValidRecipient = toAddress === expectedAddress;
     
-    console.log(`验证 to 地址: 期望 ${expectedAddress}, 实际 ${toAddress}`);
+    console.log(`Validate to address: expected ${expectedAddress}, actual ${toAddress}`);
 
     if (!isValidRecipient) {
-      return { valid: false, error: '收款地址不匹配' };
+      return { valid: false, error: 'Recipient address mismatch' };
     }
 
     if (amountWei < minAmountWei) {
-      return { valid: false, error: '交易金额不足' };
+      return { valid: false, error: 'Insufficient transaction amount' };
     }
 
     if (receipt.status !== 1) {
-      return { valid: false, error: '交易失败' };
+      return { valid: false, error: 'Transaction failed' };
     }
 
-    // 返回用户地址（用于后续给用户发放 SBT）
+    // Return user address (for subsequent SBT issuance to user)
     return { valid: true, userAddress: tx.from };
   } catch (error) {
-    console.error('支付验证错误:', error);
+    console.error('Payment validation error:', error);
     return {
       valid: false,
-      error: error instanceof Error ? error.message : '支付验证失败',
+      error: error instanceof Error ? error.message : 'Payment validation failed',
     };
   }
 }
 
-// 生成图片的核心函数
+// Core function to generate image
 export async function generateImage(prompt: string): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
   const apiKey = process.env.ZHIPUAI_API_KEY;
   if (!apiKey) {
-    return { success: false, error: '未配置API密钥' };
+    return { success: false, error: 'API key not configured' };
   }
 
   try {
@@ -155,8 +155,8 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('智谱AI API错误:', errorData);
-      return { success: false, error: '图片生成失败' };
+      console.error('ZhipuAI API error:', errorData);
+      return { success: false, error: 'Image generation failed' };
     }
 
     const data = await response.json();
@@ -164,106 +164,41 @@ export async function generateImage(prompt: string): Promise<{ success: boolean;
     
     return { success: true, imageUrl };
   } catch (error) {
-    console.error('生成图片时发生错误:', error);
+    console.error('Error occurred during image generation:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : '未知错误' 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
 }
 
-// 获取代理卡片（Agent Card）
+// Get Agent Card
 export function getAgentCard(baseUrl: string) {
   const PAYMENT_CONFIG = getPaymentConfig();
   
   return {
     "@context": "https://a2a.plus/context.jsonld",
     "@type": "Agent",
-    "name": "Image Generation Agent",
-    "description": "一个基于智谱AI的图片生成代理，可以将文本提示词转换为抽象油画风格的图片",
+    "name": "Generate Image Agent",
+    "description": "An agent that generates images based on prompts, automatically calling a Prompt Agent to get optimized prompts.",
     "version": "1.0.0",
-    "protocol": "HTTP", // 调用协议
     "capabilities": [
       {
         "name": "generate_image",
-        "description": "根据文本提示词生成1024x1024的抽象油画风格图片",
+        "description": "Generates an image based on a given topic, automatically calling a Prompt Agent to get optimized prompts.",
         "pricing": {
-          "price": PAYMENT_CONFIG.price,
-          "currency": PAYMENT_CONFIG.currency,
-          "network": PAYMENT_CONFIG.network,
-          // Generate Agent 收款地址：0x74cc09316deab81ee874839e1da9e84ec066369c
-          "address": PAYMENT_CONFIG.address
-        },
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "prompt": {
-              "type": "string",
-              "description": "图片生成的提示词"
-            }
-          },
-          "required": ["prompt"]
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "imageUrl": {
-              "type": "string",
-              "description": "生成的图片URL"
-            }
-          }
-        },
-        "example": {
-          "request": {
-            "url": "/api/a2a-agent/task?action=generate_image",
-            "method": "POST",
-            "headers": {
-              "Content-Type": "application/json",
-              "X-PAYMENT": "base64_encoded_transaction_hash"
-            },
-            "body": {
-              "prompt": "一只可爱的小猫咪"
-            }
-          },
-          "response": {
-            "code": 200,
-            "msg": "success",
-            "data": {
-              "imageUrl": "https://example.com/image.jpg",
-              "prompt": "一只可爱的小猫咪"
-            }
-          }
-        }
-      },
-      {
-        "name": "generate_image_with_prompt",
-        "description": "根据主题自动生成提示词并生成图片（会调用 Prompt Agent）",
-        "pricing": {
-          "price": PAYMENT_CONFIG.price,
-          "currency": PAYMENT_CONFIG.currency,
-          "network": PAYMENT_CONFIG.network,
-          // Generate Agent 收款地址：0x74cc09316deab81ee874839e1da9e84ec066369c
-          "address": PAYMENT_CONFIG.address,
-          "note": "包含 Prompt Agent 调用费用"
+          "price": "0.005", // Generate Agent price: 0.005 BNB
+          "currency": "BNB",
+          "network": "BSCTest",
+          "address": process.env.PAYMENT_ADDRESS || "", // User pays Generate Agent directly
+          "note": "Calling this capability requires payment of 0.005 BNB (paid directly to the agent's wallet address)"
         },
         "inputSchema": {
           "type": "object",
           "properties": {
             "topic": {
               "type": "string",
-              "description": "图片主题或内容描述"
-            },
-            "style": {
-              "type": "string",
-              "description": "艺术风格（可选，如：抽象、写实、水彩等）"
-            },
-            "additionalRequirements": {
-              "type": "string",
-              "description": "额外的要求或描述（可选）"
-            },
-            "promptAgentUrl": {
-              "type": "string",
-              "description": "Prompt Agent 的 URL（可选，默认从环境变量读取）"
+              "description": "Image topic or content description"
             }
           },
           "required": ["topic"]
@@ -273,64 +208,7 @@ export function getAgentCard(baseUrl: string) {
           "properties": {
             "imageUrl": {
               "type": "string",
-              "description": "生成的图片URL"
-            },
-            "prompt": {
-              "type": "string",
-              "description": "使用的提示词"
-            },
-            "topic": {
-              "type": "string",
-              "description": "原始主题"
-            }
-          }
-        }
-      },
-      {
-        "name": "make_payment",
-        "description": "通过智能合约或直接转账进行支付",
-        "pricing": {
-          "price": "0",
-          "currency": PAYMENT_CONFIG.currency,
-          "network": PAYMENT_CONFIG.network,
-          "note": "此方法用于支付，本身不收费"
-        },
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "recipient": {
-              "type": "string",
-              "description": "收款地址"
-            },
-            "amount": {
-              "type": "string",
-              "description": "支付金额（BNB）"
-            },
-            "description": {
-              "type": "string",
-              "description": "支付描述（可选，仅智能合约支付）"
-            },
-            "useContract": {
-              "type": "boolean",
-              "description": "是否使用智能合约支付（默认：true）"
-            }
-          },
-          "required": ["recipient", "amount"]
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "txHash": {
-              "type": "string",
-              "description": "交易哈希"
-            },
-            "recipient": {
-              "type": "string",
-              "description": "收款地址"
-            },
-            "amount": {
-              "type": "string",
-              "description": "支付金额"
+              "description": "URL of the generated image"
             }
           }
         }
@@ -340,24 +218,15 @@ export function getAgentCard(baseUrl: string) {
       "task": `${baseUrl}/api/a2a-agent/task`,
       "agentCard": `${baseUrl}/api/a2a-agent/.well-known/agent.json`
     },
-    "calling": {
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/json",
-        "X-PAYMENT": "base64_encoded_transaction_hash (必需，首次调用返回 402 获取支付信息)"
-      },
-      "format": "HTTP",
-      "note": "使用查询参数 ?action=capabilities[].name 来指定调用的能力，请求体使用 inputSchema 结构"
-    },
     "payment": {
       "required": true,
-      "defaultPrice": PAYMENT_CONFIG.price,
-      "currency": PAYMENT_CONFIG.currency,
-      "network": PAYMENT_CONFIG.network,
-      // Generate Agent 收款地址：0x74cc09316deab81ee874839e1da9e84ec066369c
-      "address": PAYMENT_CONFIG.address,
+      "defaultPrice": "0.005", // Generate Agent price: 0.005 BNB
+      "currency": "BNB",
+      "network": "BSCTest",
+      "address": process.env.PAYMENT_ADDRESS || "", // User pays Generate Agent directly
+      "minAmount": "0.005",
       "pricingModel": "per_call",
-      "note": "每个能力的具体价格请查看 capabilities[].pricing 字段"
+      "note": "Calling this Agent requires payment, specific price please refer to capabilities[].pricing field (paid directly to the agent's wallet address)"
     },
     "metadata": {
       "provider": "ZhipuAI",

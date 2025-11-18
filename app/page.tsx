@@ -8,13 +8,13 @@ import LocaleSwitcher from '../components/LocaleSwitcher';
 
 interface PaymentInfo {
   address: string;
-  amountWei: string; // Wei 格式
+  amountWei: string; // Wei format
   currency: string;
   chain: string;
-  referrer?: string; // 推广人地址（可选）
+  referrer?: string; // Referrer address (optional)
 }
 
-// MetaMask 类型声明
+// MetaMask type declaration
 interface EthereumProvider {
   request(args: { method: string; params?: any[] }): Promise<any>;
   on(event: string, handler: (...args: any[]) => void): void;
@@ -29,24 +29,24 @@ declare global {
   }
 }
 
-// 获取正确的 ethereum 提供者（处理多个钱包的情况）
+// Get correct ethereum provider (handle multiple wallets)
 function getEthereumProvider(): EthereumProvider | null {
   if (typeof window === 'undefined' || !window.ethereum) {
     return null;
   }
   
-  // 如果 ethereum 是数组，优先选择 MetaMask
+  // If ethereum is an array, prioritize MetaMask
   if (Array.isArray(window.ethereum)) {
-    // 优先查找 MetaMask
+    // Prioritize finding MetaMask
     const metaMask = window.ethereum.find((provider: any) => provider.isMetaMask);
     if (metaMask) {
       return metaMask;
     }
-    // 如果没有 MetaMask，使用第一个
+    // If no MetaMask, use the first one
     return window.ethereum[0];
   }
   
-  // 单个提供者，检查是否是 MetaMask
+  // Single provider, check if it's MetaMask
   if (window.ethereum.isMetaMask) {
     return window.ethereum;
   }
@@ -54,87 +54,87 @@ function getEthereumProvider(): EthereumProvider | null {
   return window.ethereum;
 }
 
-// 安全地请求钱包连接（避免 evmAsk.js 错误，特别针对 HTTPS 环境）
-// 注意：此函数必须在用户点击事件中直接调用，不能有任何延迟或包装
+// Safely request wallet connection (avoid evmAsk.js errors, especially for HTTPS environments)
+// Note: This function must be called directly in user click events, no delays or wrappers allowed
 async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]> {
-  // 首先尝试使用 eth_accounts（如果已经连接过，不会触发选择器）
+  // First try using eth_accounts (if already connected, won't trigger selector)
   try {
     const existingAccounts = await ethereum.request({
       method: 'eth_accounts',
     });
     if (existingAccounts && existingAccounts.length > 0) {
-      console.log('使用已连接的账户:', existingAccounts);
+      console.log('Using already connected accounts:', existingAccounts);
       return existingAccounts;
     }
   } catch (error) {
-    console.warn('eth_accounts 查询失败:', error);
+    console.warn('eth_accounts query failed:', error);
   }
 
-  // 检查是否是 HTTPS 环境（Vercel 部署）
+  // Check if it's HTTPS environment (Vercel deployment)
   const isHTTPS = window.location.protocol === 'https:';
   
-  console.log('环境信息:', {
+  console.log('Environment info:', {
     protocol: window.location.protocol,
     hostname: window.location.hostname,
     isHTTPS,
   });
 
-  // 关键：在 HTTPS 环境下，不要添加延迟！
-  // MetaMask 要求用户交互必须直接触发，任何延迟都会导致用户交互上下文丢失
-  // 只有在本地环境才添加小延迟（用于调试）
+  // Critical: In HTTPS environment, do not add delay!
+  // MetaMask requires user interaction to be triggered directly, any delay will cause user interaction context to be lost
+  // Only add small delay in local environment (for debugging)
   if (!isHTTPS) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
   try {
-    // 尝试多种方法，按优先级顺序
-    // 方法1：直接使用 eth_requestAccounts（EIP-1193 标准）
-    console.log('尝试方法1: eth_requestAccounts');
+    // Try multiple methods in priority order
+    // Method 1: Directly use eth_requestAccounts (EIP-1193 standard)
+    console.log('Trying method 1: eth_requestAccounts');
     try {
       const accounts = await ethereum.request({
         method: 'eth_requestAccounts',
       });
       
       if (accounts && accounts.length > 0) {
-        console.log('✅ 通过 eth_requestAccounts 成功获取账户:', accounts);
+        console.log('✅ Successfully got accounts via eth_requestAccounts:', accounts);
         return accounts;
       }
     } catch (reqError: any) {
-      // 如果是用户拒绝，直接抛出
+      // If user rejected, throw directly
       if (reqError.code === 4001) {
-        throw new Error('用户拒绝了连接钱包请求');
+        throw new Error('User rejected wallet connection request');
       }
       
-      // 如果是 evmAsk.js 错误，尝试其他方法
+      // If evmAsk.js error, try other methods
       if (reqError.code === -32603 || 
           reqError.message?.includes('Unexpected error') || 
           reqError.message?.includes('evmAsk') || 
           reqError.message?.includes('selectExtension')) {
-        console.warn('方法1失败（evmAsk.js错误），尝试方法2...', reqError);
+        console.warn('Method 1 failed (evmAsk.js error), trying method 2...', reqError);
         
-        // 方法2：在 HTTPS 环境下，尝试使用 wallet_requestPermissions
+        // Method 2: In HTTPS environment, try using wallet_requestPermissions
         if (isHTTPS) {
           try {
-            console.log('尝试方法2: wallet_requestPermissions');
+            console.log('Trying method 2: wallet_requestPermissions');
             await ethereum.request({
               method: 'wallet_requestPermissions',
               params: [{ eth_accounts: {} }],
             });
             
-            // 权限请求成功后，获取账户
+            // After permission request succeeds, get accounts
             const accounts = await ethereum.request({
               method: 'eth_accounts',
             });
             
             if (accounts && accounts.length > 0) {
-              console.log('✅ 通过 wallet_requestPermissions 成功获取账户:', accounts);
+              console.log('✅ Successfully got accounts via wallet_requestPermissions:', accounts);
               return accounts;
             }
           } catch (permError: any) {
-            console.warn('方法2也失败，尝试方法3...', permError);
+            console.warn('Method 2 also failed, trying method 3...', permError);
             
-            // 方法3：等待后重试 eth_accounts（可能连接已在后台建立）
-            console.log('尝试方法3: 等待后重试 eth_accounts');
+            // Method 3: Wait and retry eth_accounts (connection may have been established in background)
+            console.log('Trying method 3: Wait and retry eth_accounts');
             await new Promise(resolve => setTimeout(resolve, 1500));
             
             try {
@@ -143,37 +143,37 @@ async function safeRequestAccounts(ethereum: EthereumProvider): Promise<string[]
               });
               
               if (accounts && accounts.length > 0) {
-                console.log('✅ 通过重试 eth_accounts 成功获取账户:', accounts);
+                console.log('✅ Successfully got accounts via retry eth_accounts:', accounts);
                 return accounts;
               }
             } catch (retryError) {
-              console.warn('方法3也失败:', retryError);
+              console.warn('Method 3 also failed:', retryError);
             }
           }
         }
         
-        // 所有方法都失败，抛出友好的错误信息
-        throw new Error('钱包连接失败。这可能是由于多个钱包扩展冲突导致的。请尝试：1) 刷新页面 2) 暂时禁用其他钱包扩展 3) 确保 MetaMask 已解锁');
+        // All methods failed, throw friendly error message
+        throw new Error('Wallet connection failed. This may be caused by multiple wallet extension conflicts. Please try: 1) Refresh page 2) Temporarily disable other wallet extensions 3) Ensure MetaMask is unlocked');
       }
       
-      // 其他错误直接抛出
+      // Other errors throw directly
       throw reqError;
     }
     
-    throw new Error('未获取到账户');
+    throw new Error('No accounts obtained');
   } catch (error: any) {
-    // 处理用户拒绝
+    // Handle user rejection
     if (error.code === 4001) {
-      throw new Error('用户拒绝了连接钱包请求');
+      throw new Error('User rejected wallet connection request');
     }
     
-    // 其他错误直接抛出
+    // Other errors throw directly
     throw error;
   }
 }
 
 export default function Home() {
-  // 多语言支持
+  // Multi-language support
   const [currentLocale, setCurrentLocale] = useState<Locale>(() => {
     if (typeof window !== 'undefined') {
       return getLocale();
@@ -183,23 +183,23 @@ export default function Home() {
   const { t, loading: i18nLoading } = useTranslations(currentLocale);
   
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [sbtRarity, setSbtRarity] = useState<string | null>(null); // SBT 级别（N、R、S）
+  const [sbtRarity, setSbtRarity] = useState<string | null>(null); // SBT level (N, R, S)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [x402ResponseData, setX402ResponseData] = useState<any>(null); // 存储 402 响应的完整数据
-  const [walletConnected, setWalletConnected] = useState(false); // 钱包连接状态
-  const [walletAddress, setWalletAddress] = useState<string | null>(null); // 钱包地址
+  const [x402ResponseData, setX402ResponseData] = useState<any>(null); // Store complete 402 response data
+  const [walletConnected, setWalletConnected] = useState(false); // Wallet connection status
+  const [walletAddress, setWalletAddress] = useState<string | null>(null); // Wallet address
 
-  // 切换语言
+  // Switch language
   const handleLocaleChange = (locale: Locale) => {
     setLocale(locale);
     setCurrentLocale(locale);
   };
 
-  // 页面加载时自动检测钱包连接状态（不触发连接请求）
+  // Automatically detect wallet connection status on page load (does not trigger connection request)
   useEffect(() => {
     const checkWalletConnection = async () => {
       const ethereum = getEthereumProvider();
@@ -208,7 +208,7 @@ export default function Home() {
       }
 
       try {
-        // 只查询，不请求连接
+        // Only query, do not request connection
         const accounts = await ethereum.request({
           method: 'eth_accounts',
         });
@@ -216,16 +216,16 @@ export default function Home() {
         if (accounts && accounts.length > 0) {
           setWalletConnected(true);
           setWalletAddress(accounts[0]);
-          console.log('检测到已连接的钱包:', accounts[0]);
+          console.log('Detected connected wallet:', accounts[0]);
         }
       } catch (error) {
-        console.warn('检测钱包连接状态失败:', error);
+        console.warn('Failed to check wallet connection status:', error);
       }
     };
 
     checkWalletConnection();
 
-    // 监听账户变化
+    // Listen for account changes
     const ethereum = getEthereumProvider();
     if (ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
@@ -250,22 +250,22 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setImageUrl(null);
-    setSbtRarity(null); // 重置 SBT 级别
+    setSbtRarity(null); // Reset SBT level
     setPaymentInfo(null);
     setShowPaymentModal(false);
 
     try {
-      // 从当前页面的 URL 查询参数中获取 referrer
+      // Get referrer from current page URL query parameters
       const urlParams = new URLSearchParams(window.location.search);
       const referrer = urlParams.get('referrer') || '';
       
-      // 构建请求 URL，如果存在 referrer 则添加到查询参数中
+      // Build request URL, add referrer to query parameters if it exists
       let requestUrl = '/api/generate-agent/task';
       if (referrer) {
         requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
       }
       
-      console.log('请求 URL（包含 referrer）:', requestUrl);
+      console.log('Request URL (with referrer):', requestUrl);
       
       const response = await fetch(requestUrl, {
         method: 'POST',
@@ -275,71 +275,71 @@ export default function Home() {
         body: JSON.stringify({}),
       });
 
-      // 检查是否是 402 状态码（需要支付）
+      // Check if it's 402 status code (payment required)
       if (response.status === 402) {
         const data = await response.json();
         
-        // 保存完整的 402 响应数据（用于调试和显示）
+        // Save complete 402 response data (for debugging and display)
         setX402ResponseData(data);
-        console.log('402 响应数据格式:', JSON.stringify(data, null, 2));
+        console.log('402 response data format:', JSON.stringify(data, null, 2));
         
-        // 检查是否是 x402 标准格式
+        // Check if it's x402 standard format
         if (data.x402Version && data.accepts && data.accepts.length > 0) {
           const requirement = data.accepts[0];
           
-          // 直接使用 Wei 格式（已经是字符串格式）
+          // Directly use Wei format (already string format)
           const amountWei = requirement.maxAmountRequired;
           
-          // 优先从 accepts 对象中直接获取地址和货币（标准化格式）
-          // 如果不存在，则从 resource URL 的查询参数中提取（向后兼容）
+          // Prioritize getting address and currency directly from accepts object (standardized format)
+          // If not exists, extract from resource URL query parameters (backward compatibility)
           let address = requirement.address || '';
           let currency = requirement.currency || 'BNB';
           
           if (!address) {
-            // 向后兼容：从 resource URL 的查询参数中提取地址
+            // Backward compatibility: extract address from resource URL query parameters
             try {
               const resourceUrl = new URL(requirement.resource);
               address = resourceUrl.searchParams.get('address') || '';
             } catch (e) {
-              // 如果解析失败，尝试从 resource 中直接匹配地址
+              // If parsing fails, try to match address directly from resource
               const match = requirement.resource.match(/0x[a-fA-F0-9]{40}/);
               address = match ? match[0] : '';
             }
           }
           
-          // 解析 referrer（从 ext.referrer 字段）
-          // 优先使用 402 响应中的 referrer，如果没有则使用 URL 中的 referrer
+          // Parse referrer (from ext.referrer field)
+          // Prioritize referrer from 402 response, if not then use referrer from URL
           const referrerFromResponse = requirement.ext?.referrer || '';
           const referrerFromUrl = urlParams.get('referrer') || '';
           const referrer = referrerFromResponse || referrerFromUrl || '';
           
-          console.log('Referrer 信息:', {
+          console.log('Referrer information:', {
             fromResponse: referrerFromResponse,
             fromUrl: referrerFromUrl,
             final: referrer,
           });
           
           if (address) {
-            // 保存支付信息（使用 Wei 格式）
+            // Save payment information (using Wei format)
             setPaymentInfo({
               address: address,
               amountWei: amountWei,
               currency: currency,
               chain: requirement.network,
-              referrer: referrer, // 保存 referrer（可能来自 402 响应或 URL）
+              referrer: referrer, // Save referrer (may come from 402 response or URL)
             });
             setShowPaymentModal(true);
             setLoading(false);
             return;
           } else {
-            setError(`需要支付，但未找到收款地址。请查看 x402 响应获取支付地址。`);
+            setError(`Payment required, but payment address not found. Please check x402 response for payment address.`);
             setLoading(false);
             return;
           }
         } else {
-          // 向后兼容：旧格式（BNB 格式）
+          // Backward compatibility: old format (BNB format)
           const priceBNB = data.price || '0.02';
-          // 将 BNB 转换为 Wei
+          // Convert BNB to Wei
           const amountWei = (BigInt(Math.floor(parseFloat(priceBNB) * 1e18))).toString();
           
           if (data.address) {
@@ -353,7 +353,7 @@ export default function Home() {
             setLoading(false);
             return;
           } else {
-            setError(`需要支付 ${priceBNB} ${data.currency || 'BNB'}，但未找到收款地址。`);
+            setError(`Payment of ${priceBNB} ${data.currency || 'BNB'} required, but payment address not found.`);
             setLoading(false);
             return;
           }
@@ -362,37 +362,37 @@ export default function Home() {
 
       const data = await response.json();
 
-      // 统一响应格式：{ code: 200, msg: "success", data: { data: "图片URL" } }
+      // Unified response format: { code: 200, msg: "success", data: { data: "imageURL" } }
       if (data.code === 200 && data.data?.data) {
         setImageUrl(data.data.data);
       } else {
-        throw new Error(data.msg || '生成图片失败');
+        throw new Error(data.msg || 'Image generation failed');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成图片时发生错误');
+      setError(err instanceof Error ? err.message : 'Error occurred while generating image');
       console.error('Error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 连接钱包（独立函数，在支付前调用）
+  // Connect wallet (standalone function, called before payment)
   const handleConnectWallet = async () => {
     try {
       const ethereum = getEthereumProvider();
       
       if (!ethereum) {
-        throw new Error('请安装 MetaMask 钱包');
+        throw new Error('Please install MetaMask wallet');
       }
 
-      // 检测是否有多个钱包扩展
+      // Detect if there are multiple wallet extensions
       const hasMultipleWallets = Array.isArray(window.ethereum) && window.ethereum.length > 1;
       if (hasMultipleWallets) {
-        console.warn('检测到多个钱包扩展，可能导致连接问题');
+        console.warn('Multiple wallet extensions detected, may cause connection issues');
       }
 
-      // 直接调用，不要任何包装或延迟
-      console.log('直接调用 eth_requestAccounts...');
+      // Direct call, no wrappers or delays
+      console.log('Directly calling eth_requestAccounts...');
       const accounts = await ethereum.request({
         method: 'eth_requestAccounts',
       });
@@ -400,85 +400,85 @@ export default function Home() {
       if (accounts && accounts.length > 0) {
         setWalletConnected(true);
         setWalletAddress(accounts[0]);
-        console.log('✅ 钱包连接成功:', accounts[0]);
+        console.log('✅ Wallet connected successfully:', accounts[0]);
         return accounts[0];
       }
 
-      throw new Error('未获取到账户');
+      throw new Error('No accounts obtained');
     } catch (error: any) {
-      console.error('钱包连接失败:', error);
+      console.error('Wallet connection failed:', error);
       
       if (error.code === 4001) {
-        throw new Error('用户拒绝了连接钱包请求');
+        throw new Error('User rejected wallet connection request');
       }
       
-      // 检测是否是多个钱包扩展冲突
+      // Detect if it's multiple wallet extension conflict
       const hasMultipleWallets = Array.isArray(window.ethereum) && window.ethereum.length > 1;
       if (hasMultipleWallets && (error.code === -32603 || error.message?.includes('evmAsk') || error.message?.includes('selectExtension'))) {
-        throw new Error('检测到多个钱包扩展冲突。请暂时禁用其他钱包扩展，只保留 MetaMask，然后刷新页面重试');
+        throw new Error('Multiple wallet extension conflict detected. Please temporarily disable other wallet extensions, keep only MetaMask, then refresh the page and retry');
       }
       
-      throw new Error(error.message || '钱包连接失败');
+      throw new Error(error.message || 'Wallet connection failed');
     }
   };
 
-  // 连接钱包并支付（使用 Wei 格式）
+  // Connect wallet and pay (using Wei format)
   const handlePayment = async () => {
     if (!paymentInfo) return;
 
     setPaymentLoading(true);
     try {
-      // 如果钱包未连接，先连接
+      // If wallet not connected, connect first
       if (!walletConnected || !walletAddress) {
-        console.log('钱包未连接，先连接钱包...');
+        console.log('Wallet not connected, connecting wallet...');
         await handleConnectWallet();
       }
 
-      // 获取正确的 ethereum 提供者
+      // Get correct ethereum provider
       const ethereum = getEthereumProvider();
       
       if (!ethereum) {
-        throw new Error('请安装 MetaMask 钱包');
+        throw new Error('Please install MetaMask wallet');
       }
 
-      // 再次确认账户（防止状态不同步）
+      // Confirm account again (prevent state desync)
       let accounts: string[];
       try {
         accounts = await ethereum.request({
           method: 'eth_accounts',
         });
       } catch (error) {
-        console.warn('获取账户失败，尝试重新连接...', error);
+        console.warn('Failed to get accounts, trying to reconnect...', error);
         accounts = await safeRequestAccounts(ethereum);
       }
 
       if (!accounts || accounts.length === 0) {
-        throw new Error('请先连接钱包');
+        throw new Error('Please connect wallet first');
       }
 
       const fromAddress = accounts[0];
 
-      // 获取网络信息（添加错误处理）
+      // Get network information (add error handling)
       let chainId: string;
       try {
         chainId = await ethereum.request({ method: 'eth_chainId' });
       } catch (error: any) {
-        console.error('获取链 ID 失败:', error);
-        throw new Error(`获取网络信息失败: ${error.message || '未知错误'}`);
+        console.error('Failed to get chain ID:', error);
+        throw new Error(`Failed to get network information: ${error.message || 'Unknown error'}`);
       }
       
       // BSC Testnet chainId: 0x61 (97)
       const bscTestnetChainId = '0x61';
       
       if (chainId !== bscTestnetChainId) {
-        // 尝试切换到 BSC Testnet
+        // Try to switch to BSC Testnet
         try {
           await ethereum.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: bscTestnetChainId }],
           });
         } catch (switchError: any) {
-          // 如果链不存在，添加链
+          // If chain doesn't exist, add chain
           if (switchError.code === 4902) {
             try {
               await ethereum.request({
@@ -498,65 +498,65 @@ export default function Home() {
                 ],
               });
             } catch (addError: any) {
-              console.error('添加链失败:', addError);
-              throw new Error(`添加 BSC Testnet 失败: ${addError.message || '未知错误'}`);
+              console.error('Failed to add chain:', addError);
+              throw new Error(`Failed to add BSC Testnet: ${addError.message || 'Unknown error'}`);
             }
           } else if (switchError.code === 4001) {
-            throw new Error('用户拒绝了切换网络请求');
+            throw new Error('User rejected network switch request');
           } else {
-            console.error('切换网络失败:', switchError);
-            throw new Error(`切换网络失败: ${switchError.message || '未知错误'}`);
+            console.error('Failed to switch network:', switchError);
+            throw new Error(`Failed to switch network: ${switchError.message || 'Unknown error'}`);
           }
         }
       }
 
-      // 检查地址是否是合约地址（通过检查 code 是否为空）
+      // Check if address is a contract address (by checking if code is not empty)
       const provider = new ethers.BrowserProvider(ethereum);
       const code = await provider.getCode(paymentInfo.address);
       const isContract = code && code !== '0x';
       
-      // 将 Wei 字符串转换为十六进制
+      // Convert Wei string to hexadecimal
       const amountHex = '0x' + BigInt(paymentInfo.amountWei).toString(16);
       
       let txHash: string;
       
       if (isContract) {
-        // 如果是合约地址，调用合约的 makePayment 方法（支持 referrer）
+        // If it's a contract address, call contract's makePayment method (supports referrer)
         const contractAddress = paymentInfo.address;
         
-        // 准备合约调用数据
-        // 合约方法：makePayment(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+        // Prepare contract call data
+        // Contract method: makePayment(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
         const iface = new ethers.Interface([
           'function makePayment(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)'
         ]);
         
-        // 从 URL 中获取 referrer（优先使用 URL 中的 referrer，因为这是用户输入的）
+        // Get referrer from URL (prioritize referrer from URL, as it's user input)
         const urlParams = new URLSearchParams(window.location.search);
         const referrerFromUrl = urlParams.get('referrer') || '';
-        // 优先使用 URL 中的 referrer，如果没有则使用 paymentInfo 中的 referrer
+        // Prioritize referrer from URL, if not then use referrer from paymentInfo
         const referrerString = referrerFromUrl || paymentInfo.referrer || '';
         
-        console.log('前端支付时 referrer 信息:');
-        console.log('  - 当前页面 URL:', window.location.href);
-        console.log('  - 从 URL 获取的 referrer:', referrerFromUrl || '(空字符串)');
-        console.log('  - paymentInfo.referrer:', paymentInfo.referrer || '(空字符串)');
-        console.log('  - 最终使用的 referrer:', referrerString || '(空字符串)');
+        console.log('Referrer information when paying from frontend:');
+        console.log('  - Current page URL:', window.location.href);
+        console.log('  - Referrer from URL:', referrerFromUrl || '(empty string)');
+        console.log('  - paymentInfo.referrer:', paymentInfo.referrer || '(empty string)');
+        console.log('  - Final referrer used:', referrerString || '(empty string)');
         
-        // 编码函数调用数据
+        // Encode function call data
         const data = iface.encodeFunctionData('makePayment', [
-          fromAddress, // 用户地址作为 recipient，用于发放 SBT
-          '', // 备注信息（前端支付时可以为空）
-          referrerString, // 推广人（字符串格式）
+          fromAddress, // User address as recipient, for SBT issuance
+          '', // Note (can be empty for frontend payment)
+          referrerString, // Referrer (string format)
         ]);
         
-        console.log('前端调用合约 makePayment 的参数:');
+        console.log('Parameters for frontend calling contract makePayment:');
         console.log('  - recipient:', fromAddress);
-        console.log('  - description:', '(空字符串)');
-        console.log('  - referrer:', referrerString || '(空字符串)');
-        console.log('  - 编码后的 data:', data);
+        console.log('  - description:', '(empty string)');
+        console.log('  - referrer:', referrerString || '(empty string)');
+        console.log('  - Encoded data:', data);
 
-        // 估算 gas（合约调用需要更多 gas）
-        let gasLimit = '0x186a0'; // 默认 100000
+        // Estimate gas (contract calls need more gas)
+        let gasLimit = '0x186a0'; // Default 100000
         try {
           const gasEstimate = await ethereum.request({
             method: 'eth_estimateGas',
@@ -569,13 +569,13 @@ export default function Home() {
               },
             ],
           });
-          // 增加 20% 的缓冲
+          // Add 20% buffer
           gasLimit = '0x' + (BigInt(gasEstimate) * BigInt(120) / BigInt(100)).toString(16);
         } catch (error) {
-          console.warn('Gas 估算失败，使用默认值:', error);
+          console.warn('Gas estimation failed, using default value:', error);
         }
 
-        // 发起合约调用交易（添加错误处理）
+        // Initiate contract call transaction (add error handling)
         try {
           txHash = await ethereum.request({
             method: 'eth_sendTransaction',
@@ -584,24 +584,24 @@ export default function Home() {
                 from: fromAddress,
                 to: contractAddress,
                 value: amountHex,
-                data: data, // 包含合约方法调用数据（包括 referrer）
+                data: data, // Contains contract method call data (including referrer)
                 gas: gasLimit,
               },
             ],
           });
         } catch (error: any) {
           if (error.code === 4001) {
-            throw new Error('用户拒绝了交易请求');
+            throw new Error('User rejected transaction request');
           }
           if (error.code === -32603) {
-            throw new Error('钱包内部错误，请刷新页面重试');
+            throw new Error('Wallet internal error, please refresh page and retry');
           }
-          console.error('发送交易失败:', error);
-          throw new Error(`发送交易失败: ${error.message || '未知错误'}`);
+          console.error('Failed to send transaction:', error);
+          throw new Error(`Failed to send transaction: ${error.message || 'Unknown error'}`);
         }
       } else {
-        // 如果是普通钱包地址（EOA），使用简单转账（不支持 referrer）
-        console.warn('地址是普通钱包地址，使用简单转账（不支持 referrer）');
+        // If it's a regular wallet address (EOA), use simple transfer (does not support referrer)
+        console.warn('Address is a regular wallet address, using simple transfer (does not support referrer)');
         
         try {
           txHash = await ethereum.request({
@@ -617,22 +617,22 @@ export default function Home() {
           });
         } catch (error: any) {
           if (error.code === 4001) {
-            throw new Error('用户拒绝了交易请求');
+            throw new Error('User rejected transaction request');
           }
           if (error.code === -32603) {
-            throw new Error('钱包内部错误，请刷新页面重试');
+            throw new Error('Wallet internal error, please refresh page and retry');
           }
-          console.error('发送交易失败:', error);
-          throw new Error(`发送交易失败: ${error.message || '未知错误'}`);
+          console.error('Failed to send transaction:', error);
+          throw new Error(`Failed to send transaction: ${error.message || 'Unknown error'}`);
         }
       }
 
-      console.log('支付交易已发送:', txHash);
+      console.log('Payment transaction sent:', txHash);
 
-      // 等待交易确认
+      // Wait for transaction confirmation
       let receipt = null;
       let retryCount = 0;
-      const maxRetries = 30; // 最多等待 60 秒
+      const maxRetries = 30; // Maximum wait 60 seconds
       while (!receipt && retryCount < maxRetries) {
         try {
           receipt = await ethereum.request({
@@ -640,7 +640,7 @@ export default function Home() {
             params: [txHash],
           });
         } catch (error) {
-          console.warn('查询交易收据失败，重试中...', error);
+          console.warn('Failed to query transaction receipt, retrying...', error);
         }
         if (!receipt) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -649,47 +649,47 @@ export default function Home() {
       }
       
       if (!receipt) {
-        throw new Error('交易确认超时，请手动检查交易状态');
+        throw new Error('Transaction confirmation timeout, please manually check transaction status');
       }
 
-      console.log('交易已确认:', receipt);
+      console.log('Transaction confirmed:', receipt);
 
-      // 将交易哈希编码为 Base64
+      // Encode transaction hash as Base64
       const xPayment = btoa(txHash);
 
-      // 关闭支付弹窗
+      // Close payment modal
       setShowPaymentModal(false);
       setPaymentInfo(null);
 
-      // 重新发送请求，带上 X-PAYMENT 头
+      // Resend request with X-PAYMENT header
       await handleGenerateWithPayment(xPayment);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '支付失败');
-      console.error('支付错误:', err);
+      setError(err instanceof Error ? err.message : 'Payment failed');
+      console.error('Payment error:', err);
     } finally {
       setPaymentLoading(false);
     }
   };
 
-  // 带支付信息的生成请求
+  // Generate request with payment information
   const handleGenerateWithPayment = async (xPayment: string) => {
     setLoading(true);
     setError(null);
     setImageUrl(null);
-    setSbtRarity(null); // 重置 SBT 级别
+    setSbtRarity(null); // Reset SBT level
 
     try {
-      // 从 URL 中获取 referrer，确保在请求中包含
+      // Get referrer from URL, ensure it's included in request
       const urlParams = new URLSearchParams(window.location.search);
       const referrer = urlParams.get('referrer') || '';
       
-      // 构建请求 URL，如果存在 referrer 则添加到查询参数中
+      // Build request URL, add referrer to query parameters if it exists
       let requestUrl = '/api/generate-agent/task';
       if (referrer) {
         requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
       }
       
-      console.log('handleGenerateWithPayment 请求 URL（包含 referrer）:', requestUrl);
+      console.log('handleGenerateWithPayment request URL (with referrer):', requestUrl);
       
       const response = await fetch(requestUrl, {
         method: 'POST',
@@ -700,54 +700,54 @@ export default function Home() {
         body: JSON.stringify({}),
       });
 
-      // 如果仍然返回 402，说明支付验证失败
+      // If still returns 402, payment verification failed
       if (response.status === 402) {
         const data = await response.json();
-        const errorMsg = data.error || data.accepts?.[0]?.ext?.error || '支付验证失败，请重试';
+        const errorMsg = data.error || data.accepts?.[0]?.ext?.error || 'Payment verification failed, please retry';
         const errorDetails = data.accepts?.[0]?.ext?.errorDetails || data.accepts?.[0]?.ext || null;
-        throw new Error(`${errorMsg}${errorDetails ? '\n错误详情: ' + JSON.stringify(errorDetails, null, 2) : ''}`);
+        throw new Error(`${errorMsg}${errorDetails ? '\nError details: ' + JSON.stringify(errorDetails, null, 2) : ''}`);
       }
 
       const data = await response.json();
 
-      // 统一响应格式：{ code: 200, msg: "success", data: { data: "图片URL" } }
+      // Unified response format: { code: 200, msg: "success", data: { data: "imageURL" } }
       if (data.code === 200 && data.data?.data) {
         setImageUrl(data.data.data);
       } else {
-        // 如果 data.data 包含错误信息，显示详细错误
+        // If data.data contains error information, display detailed error
         const errorInfo = data.data?.error || null;
-        const errorMsg = data.msg || '生成图片失败';
+        const errorMsg = data.msg || 'Image generation failed';
         
         if (errorInfo) {
           let errorDetails = '';
           
           if (typeof errorInfo === 'object') {
-            // 检查是否有 details 字段，包含授权地址信息
+            // Check if there's a details field containing authorization address information
             const details = errorInfo.details || errorInfo;
             if (details.authorizedMinterAddress || details.currentAddress) {
-              // 构建包含地址信息的错误消息
-              errorDetails = `\n\n【地址信息】\n`;
+              // Build error message with address information
+              errorDetails = `\n\n[Address Information]\n`;
               if (details.currentAddress) {
-                errorDetails += `当前使用的地址（无权限）: ${details.currentAddress}\n`;
+                errorDetails += `Current address used (no permission): ${details.currentAddress}\n`;
               }
               if (details.authorizedMinterAddress) {
-                errorDetails += `正确的授权地址: ${details.authorizedMinterAddress}\n`;
+                errorDetails += `Correct authorized address: ${details.authorizedMinterAddress}\n`;
               }
-              errorDetails += `\n请确保 PROMPT_PRIVATE_KEY 对应的地址已被授权为合约的 minter。\n`;
+              errorDetails += `\nPlease ensure the address corresponding to PROMPT_PRIVATE_KEY has been authorized as the contract's minter.\n`;
               
-              // 添加其他错误详情（如果有）
+              // Add other error details (if any)
               const otherDetails = { ...details };
               delete otherDetails.authorizedMinterAddress;
               delete otherDetails.currentAddress;
               if (Object.keys(otherDetails).length > 0 && otherDetails.error) {
-                errorDetails += `\n其他错误详情:\n${JSON.stringify(otherDetails, null, 2)}`;
+                errorDetails += `\nOther error details:\n${JSON.stringify(otherDetails, null, 2)}`;
               }
             } else {
-              // 普通错误详情
-              errorDetails = `\n\n错误详情:\n${JSON.stringify(errorInfo, null, 2)}`;
+              // Regular error details
+              errorDetails = `\n\nError details:\n${JSON.stringify(errorInfo, null, 2)}`;
             }
           } else {
-            errorDetails = `\n\n错误详情:\n${String(errorInfo)}`;
+            errorDetails = `\n\nError details:\n${String(errorInfo)}`;
           }
           
           throw new Error(`${errorMsg}${errorDetails}`);
@@ -756,7 +756,7 @@ export default function Home() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成图片时发生错误');
+      setError(err instanceof Error ? err.message : 'Error occurred while generating image');
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -764,12 +764,12 @@ export default function Home() {
   };
 
 
-  // 将 Wei 转换为 BNB 用于显示
+  // Convert Wei to BNB for display
   const weiToBNB = (wei: string): string => {
     try {
       const weiBigInt = BigInt(wei);
       const bnb = Number(weiBigInt) / 1e18;
-      return bnb.toFixed(18).replace(/\.?0+$/, ''); // 移除尾随零
+      return bnb.toFixed(18).replace(/\.?0+$/, ''); // Remove trailing zeros
     } catch {
       return '0';
     }
@@ -777,7 +777,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
-      {/* 导航栏 */}
+      {/* Navigation bar */}
       <nav className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -801,17 +801,17 @@ export default function Home() {
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <main className="flex w-full max-w-4xl flex-col items-center justify-start py-8 px-4 sm:px-8 md:px-16">
         <div className="w-full space-y-6">
-          {/* 标题 */}
+          {/* Title */}
           <div className="text-center">
             <h1 className="text-3xl font-bold text-black dark:text-zinc-50 mb-2">
-              智谱AI 图片生成测试
+              {t('home.title')}
             </h1>
             <p className="text-zinc-600 dark:text-zinc-400">
-              CogView-3-Flash 模型
+              {t('home.subtitle')}
             </p>
           </div>
 
-          {/* 生成按钮区域 */}
+          {/* Generate button area */}
           <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6">
             <p className="text-center text-sm text-zinc-600 dark:text-zinc-400 mb-6">
               {t('home.description')}
@@ -855,7 +855,7 @@ export default function Home() {
               )}
             </button>
 
-            {/* 错误提示 */}
+            {/* Error message */}
             {error && (
               <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
@@ -863,7 +863,7 @@ export default function Home() {
             )}
           </div>
 
-          {/* 支付弹窗 */}
+          {/* Payment modal */}
           {showPaymentModal && paymentInfo && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
@@ -905,7 +905,7 @@ export default function Home() {
                   </div>
                 </div>
                 
-                {/* 如果钱包未连接，显示连接按钮 */}
+                {/* If wallet not connected, show connect button */}
                 {!walletConnected && (
                   <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
@@ -925,16 +925,16 @@ export default function Home() {
                     </button>
                   </div>
                 )}
-                {/* 402 响应数据格式显示 */}
+                {/* 402 response data format display */}
                 {x402ResponseData && (
                   <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                     <details className="cursor-pointer">
                       <summary className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2 select-none">
-                        📋 查看 402 响应数据格式
+                        📋 {t('payment.view402Response')}
                       </summary>
                       <div className="mt-2">
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                          这是从服务器接收到的完整 402 响应数据（x402 标准格式）：
+                          {t('payment.view402ResponseDesc')}
                         </p>
                         <pre className="text-xs text-zinc-600 dark:text-zinc-400 overflow-auto max-h-60 p-2 bg-white dark:bg-zinc-900 rounded border border-zinc-200 dark:border-zinc-700">
                           {JSON.stringify(x402ResponseData, null, 2)}
@@ -948,7 +948,7 @@ export default function Home() {
                     onClick={() => {
                       setShowPaymentModal(false);
                       setPaymentInfo(null);
-                      setX402ResponseData(null); // 清空 402 响应数据
+                      setX402ResponseData(null);
                     }}
                     className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg transition-colors"
                     disabled={paymentLoading}
@@ -993,12 +993,12 @@ export default function Home() {
             </div>
           )}
 
-          {/* 图片展示区域 */}
+          {/* Image display area */}
           {imageUrl && (
             <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                  生成的图片
+                  {t('home.generatedImage')}
                 </h2>
                 {sbtRarity && (
                   <div className="flex items-center gap-2">
@@ -1031,7 +1031,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
                 >
-                  查看原图
+                  {t('home.viewOriginal')}
                 </a>
                 <button
                   onClick={() => {
@@ -1042,7 +1042,7 @@ export default function Home() {
                   }}
                   className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-zinc-100 rounded-lg transition-colors text-sm"
                 >
-                  下载图片
+                  {t('home.downloadImage')}
                 </button>
               </div>
             </div>

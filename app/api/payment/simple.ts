@@ -1,52 +1,52 @@
 /**
- * 简化的支付工具函数
- * 直接在服务器上使用私钥进行支付
+ * Simplified payment utility functions
+ * Directly use private key for payment on server
  * 
- * 注意：确保私钥安全存储在环境变量中
+ * Note: Ensure private key is securely stored in environment variables
  */
 
 import { ethers } from 'ethers';
 
-// 获取支付配置
+// Get payment configuration
 function getPaymentConfig() {
   // ============================================================================
-  // 【重要】合约支付配置说明：
+  // 【Important】Contract Payment Configuration:
   // ============================================================================
-  // PAYMENT_CONTRACT_ADDRESS: 智能合约地址（必需，用于合约支付）
-  //   - 用途：Generate Agent 支付给 Prompt Agent 时调用的合约地址
-  //   - 功能：接收 Generate Agent 的支付，并给用户（recipient）发放 SBT Token
-  //   - 使用场景：
-  //     * Generate Agent 支付给 Prompt Agent（通过合约 makePayment 方法）
-  //   - 流程：Generate Agent → 调用合约 makePayment(recipient, description, referrer) → 合约给用户发放 SBT
-  //   - 示例：0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
+  // PAYMENT_CONTRACT_ADDRESS: Smart contract address (required, for contract payment)
+  //   - Purpose: Contract address called when Generate Agent pays Prompt Agent
+  //   - Function: Receive payment from Generate Agent and issue SBT Token to user (recipient)
+  //   - Use cases:
+  //     * Generate Agent pays Prompt Agent (via contract makePayment method)
+  //   - Flow: Generate Agent → call contract makePayment(recipient, description, referrer) → contract issues SBT to user
+  //   - Example: 0x1956f3E39c7a9Bdd8E35a0345379692C3f433898
   //
-  // PAYMENT_PRIVATE_KEY: Generate Agent 的钱包私钥
-  //   - 用途：Generate Agent 自动支付给 Prompt Agent 时使用的私钥
+  // PAYMENT_PRIVATE_KEY: Generate Agent wallet private key
+  //   - Purpose: Private key used when Generate Agent automatically pays Prompt Agent
   //
-  // PROMPT_PRIVATE_KEY: Prompt Agent 的钱包私钥（优先使用）
-  //   - 用途：Prompt Agent 调用合约生成 SBT 时使用的私钥
-  //   - 优先级：如果存在 PROMPT_PRIVATE_KEY，优先使用它；否则使用 PAYMENT_PRIVATE_KEY
+  // PROMPT_PRIVATE_KEY: Prompt Agent wallet private key (priority)
+  //   - Purpose: Private key used when Prompt Agent calls contract to mint SBT
+  //   - Priority: If PROMPT_PRIVATE_KEY exists, use it first; otherwise use PAYMENT_PRIVATE_KEY
   //
-  // 注意：用户支付给 Generate Agent 不使用此配置
-  //      用户支付给 Generate Agent 是直接转账到 PAYMENT_ADDRESS（普通钱包地址）
+  // Note: User payment to Generate Agent does not use this configuration
+  //       User payment to Generate Agent is direct transfer to PAYMENT_ADDRESS (regular wallet address)
   // ============================================================================
   const contractAddress = process.env.PAYMENT_CONTRACT_ADDRESS || '';
   
-  // 优先使用 PROMPT_PRIVATE_KEY，否则使用 PAYMENT_PRIVATE_KEY
+  // Prioritize PROMPT_PRIVATE_KEY, otherwise use PAYMENT_PRIVATE_KEY
   const privateKey = process.env.PROMPT_PRIVATE_KEY || process.env.PAYMENT_PRIVATE_KEY || '';
   
-  // 记录配置信息（用于调试）
+  // Log configuration info (for debugging)
   if (contractAddress) {
-    console.log(`📋 合约支付配置: PAYMENT_CONTRACT_ADDRESS（智能合约）`);
-    console.log(`   合约地址: ${contractAddress}`);
+    console.log(`📋 Contract payment configuration: PAYMENT_CONTRACT_ADDRESS (smart contract)`);
+    console.log(`   Contract address: ${contractAddress}`);
   } else {
-    console.warn('⚠️  合约地址未配置: PAYMENT_CONTRACT_ADDRESS 为空');
+    console.warn('⚠️  Contract address not configured: PAYMENT_CONTRACT_ADDRESS is empty');
   }
   
   if (process.env.PROMPT_PRIVATE_KEY) {
-    console.log(`📋 使用的私钥: PROMPT_PRIVATE_KEY（Prompt Agent）`);
+    console.log(`📋 Private key used: PROMPT_PRIVATE_KEY (Prompt Agent)`);
   } else if (process.env.PAYMENT_PRIVATE_KEY) {
-    console.log(`📋 使用的私钥: PAYMENT_PRIVATE_KEY（Generate Agent）`);
+    console.log(`📋 Private key used: PAYMENT_PRIVATE_KEY (Generate Agent)`);
   }
   
   return {
@@ -56,33 +56,33 @@ function getPaymentConfig() {
   };
 }
 
-// SBT 级别类型
+// SBT rarity level type
 export type SBTRarity = 'N' | 'R' | 'S';
 
-// 调用智能合约支付（合约直接收款，给 recipient 发放 SBT）
+// Call smart contract payment (contract directly receives payment, issues SBT to recipient)
 export async function makeContractPayment(
   amount: string,
   description: string = '',
-  recipient: string, // 必需：接收 SBT 的地址（用户付款的钱包地址）
-  contractAddress?: string, // 可选：指定合约地址（如果不提供，使用环境变量中的地址）
-  referrer: string = '', // 可选：推广人（字符串格式，默认为空字符串）
-  rarity: SBTRarity = 'N' // 可选：SBT 级别（N级、R级、S级），默认为 N级
+  recipient: string, // Required: Address to receive SBT (user's payment wallet address)
+  contractAddress?: string, // Optional: Specify contract address (if not provided, use address from env vars)
+  referrer: string = '', // Optional: Referrer (string format, default empty string)
+  rarity: SBTRarity = 'N' // Optional: SBT level (N, R, S), default N
 ): Promise<{ success: boolean; txHash?: string; error?: string; errorDetails?: any }> {
   try {
     const config = getPaymentConfig();
     
-    // 直接使用配置中的私钥（已优先使用 PROMPT_PRIVATE_KEY，否则使用 PAYMENT_PRIVATE_KEY）
+    // Directly use private key from config (already prioritized PROMPT_PRIVATE_KEY, otherwise PAYMENT_PRIVATE_KEY)
     const usedPrivateKey = config.privateKey;
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('🔍 makeContractPayment 私钥检查');
+    console.log('🔍 makeContractPayment private key check');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('PROMPT_PRIVATE_KEY 是否存在:', process.env.PROMPT_PRIVATE_KEY ? '是' : '否');
-    console.log('PAYMENT_PRIVATE_KEY 是否存在:', process.env.PAYMENT_PRIVATE_KEY ? '是' : '否');
-    console.log('最终使用的私钥来源:', process.env.PROMPT_PRIVATE_KEY ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+    console.log('PROMPT_PRIVATE_KEY exists:', process.env.PROMPT_PRIVATE_KEY ? 'Yes' : 'No');
+    console.log('PAYMENT_PRIVATE_KEY exists:', process.env.PAYMENT_PRIVATE_KEY ? 'Yes' : 'No');
+    console.log('Final private key source:', process.env.PROMPT_PRIVATE_KEY ? 'PROMPT_PRIVATE_KEY (Prompt Agent)' : 'PAYMENT_PRIVATE_KEY (Generate Agent)');
     if (usedPrivateKey) {
       const testWallet = new ethers.Wallet(usedPrivateKey);
-      console.log('使用的私钥对应的地址:', testWallet.address);
+      console.log('Address corresponding to private key used:', testWallet.address);
     }
     console.log('═══════════════════════════════════════════════════════════');
     
@@ -90,79 +90,79 @@ export async function makeContractPayment(
       return { success: false, error: 'Private key not configured (neither PROMPT_PRIVATE_KEY nor PAYMENT_PRIVATE_KEY in env)' };
     }
     
-    // 使用提供的地址或环境变量中的地址
+    // Use provided address or address from environment variables
     const targetAddress = contractAddress || config.contractAddress;
     if (!targetAddress) {
       return { success: false, error: 'Contract address not configured' };
     }
 
-    // 验证 recipient 地址格式
+    // Validate recipient address format
     if (!recipient || !ethers.isAddress(recipient)) {
       return { success: false, error: 'Invalid recipient address' };
     }
 
-    // 1. 创建钱包和提供者
+    // 1. Create wallet and provider
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
     const wallet = new ethers.Wallet(usedPrivateKey, provider);
 
-    // 2. 检查钱包余额
+    // 2. Check wallet balance
     const balance = await provider.getBalance(wallet.address);
     const value = ethers.parseEther(amount);
-    const minBalance = value + ethers.parseEther('0.001'); // 预留一些 gas 费用
+    const minBalance = value + ethers.parseEther('0.001'); // Reserve some gas fees
     
     if (balance < minBalance) {
       return {
         success: false,
-        error: `钱包余额不足。需要: ${ethers.formatEther(minBalance)} BNB, 当前余额: ${ethers.formatEther(balance)} BNB`,
+        error: `Insufficient wallet balance. Required: ${ethers.formatEther(minBalance)} BNB, Current balance: ${ethers.formatEther(balance)} BNB`,
       };
     }
 
-    // 3. 准备智能合约调用数据
-    // 根据 rarity 选择不同的合约方法：
-    // - N级：mintNSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
-    // - R级：mintRSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
-    // - S级：mintSSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
-    // recipient 用于给用户发放 SBT
-    // referrer 用于统计推广人（可选，如果没有提供则使用空字符串）
+    // 3. Prepare smart contract call data
+    // Select different contract methods based on rarity:
+    // - N level: mintNSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // - R level: mintRSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // - S level: mintSSBT(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)
+    // recipient is used to issue SBT to user
+    // referrer is used for referrer statistics (optional, use empty string if not provided)
     
-    // 根据 rarity 选择方法名
+    // Select method name based on rarity
     const methodName = rarity === 'N' ? 'mintNSBT' : rarity === 'R' ? 'mintRSBT' : 'mintSSBT';
     
     const iface = new ethers.Interface([
       `function ${methodName}(address recipient, string memory description, string memory referrer) payable returns (uint256 tokenId)`
     ]);
     
-    // referrer 已经是字符串格式，如果没有提供则使用空字符串
+    // referrer is already string format, use empty string if not provided
     const referrerString = typeof referrer === 'string' ? referrer : '';
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('🔄 makeContractPayment 开始执行');
+    console.log('🔄 makeContractPayment starting execution');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📋 接收到的参数:');
-    console.log('  - 合约地址:', targetAddress);
-    console.log('  - 支付金额 (BNB):', amount);
-    console.log('  - 支付金额 (Wei):', ethers.parseEther(amount).toString());
+    console.log('📋 Received parameters:');
+    console.log('  - Contract address:', targetAddress);
+    console.log('  - Payment amount (BNB):', amount);
+    console.log('  - Payment amount (Wei):', ethers.parseEther(amount).toString());
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🎯 SBT 发放目标钱包地址 (recipient):', recipient);
-    console.log('   ⚠️  合约将向此地址发放 SBT Token');
+    console.log('🎯 SBT issuance target wallet address (recipient):', recipient);
+    console.log('   ⚠️  Contract will issue SBT Token to this address');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  - Description:', description || '(空字符串)');
-    console.log('  - Referrer:', referrerString || '(空字符串)');
-    console.log('  - SBT 级别:', rarity, `(${rarity === 'N' ? 'N级（普通）' : rarity === 'R' ? 'R级（稀有）' : 'S级（超级稀有）'})`);
-    console.log('  - 合约方法:', methodName);
+    console.log('  - Description:', description || '(empty string)');
+    console.log('  - Referrer:', referrerString || '(empty string)');
+    console.log('  - SBT level:', rarity, `(${rarity === 'N' ? 'N (Normal)' : rarity === 'R' ? 'R (Rare)' : 'S (Super Rare)'})`);
+    console.log('  - Contract method:', methodName);
     console.log('═══════════════════════════════════════════════════════════');
     
-    // 编码函数调用数据（使用根据 rarity 选择的方法名）
+    // Encode function call data (using method name selected based on rarity)
     const data = iface.encodeFunctionData(methodName, [recipient, description || '', referrerString]);
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📦 编码后的合约调用数据 (data):', data);
-    console.log('📤 传递给合约的参数:');
-    console.log('  - recipient (SBT 接收者):', recipient);
-    console.log('  - description:', description || '(空字符串)');
-    console.log('  - referrer:', referrerString || '(空字符串)');
+    console.log('📦 Encoded contract call data (data):', data);
+    console.log('📤 Parameters passed to contract:');
+    console.log('  - recipient (SBT receiver):', recipient);
+    console.log('  - description:', description || '(empty string)');
+    console.log('  - referrer:', referrerString || '(empty string)');
 
-    // 4. 估算 gas 并设置足够的 gas limit
+    // 4. Estimate gas and set sufficient gas limit
     let gasLimit: bigint;
     try {
       const gasEstimate = await provider.estimateGas({
@@ -171,61 +171,61 @@ export async function makeContractPayment(
         value,
         data,
       });
-      console.log('Gas 估算成功:', gasEstimate.toString());
+      console.log('Gas estimation successful:', gasEstimate.toString());
       
-      // 增加 30% 的缓冲，确保有足够的 gas
+      // Add 30% buffer to ensure sufficient gas
       gasLimit = (gasEstimate * BigInt(130)) / BigInt(100);
-      console.log('设置 Gas Limit:', gasLimit.toString(), '(估算值的 130%)');
+      console.log('Set Gas Limit:', gasLimit.toString(), '(130% of estimated value)');
     } catch (gasError: any) {
-      // Gas 估算失败，说明合约调用会失败
-      let errorMessage = '合约调用失败（gas 估算失败）';
+      // Gas estimation failed, contract call will fail
+      let errorMessage = 'Contract call failed (gas estimation failed)';
       let authorizedMinterAddress: string | null = null;
       
       if (gasError?.reason) {
-        errorMessage = `合约调用失败: ${gasError.reason}`;
+        errorMessage = `Contract call failed: ${gasError.reason}`;
       } else if (gasError?.message) {
-        // 尝试从错误消息中提取有用信息
+        // Try to extract useful information from error message
         const msg = gasError.message;
         if (msg.includes('execution reverted')) {
-          errorMessage = '合约执行被回退，可能是合约的 require 检查失败。请检查：1) recipient 地址是否有效 2) 合约状态是否允许此操作 3) 支付金额是否满足合约要求';
+          errorMessage = 'Contract execution reverted, possibly contract require check failed. Please check: 1) Is recipient address valid 2) Does contract state allow this operation 3) Does payment amount meet contract requirements';
         } else {
-          errorMessage = `合约调用失败: ${msg}`;
+          errorMessage = `Contract call failed: ${msg}`;
         }
       }
       
-      // 如果是 "Only authorized minter" 错误，查询合约的授权 minter 地址
+      // If "Only authorized minter" error, query contract's authorized minter address
       if (errorMessage.includes('Only authorized minter') || errorMessage.includes('authorized minter')) {
         try {
           const contract = new ethers.Contract(targetAddress, ['function authorizedMinter() view returns (address)'], provider);
           authorizedMinterAddress = await contract.authorizedMinter();
-          console.log('查询到合约的授权 minter 地址:', authorizedMinterAddress);
+          console.log('Queried contract authorized minter address:', authorizedMinterAddress);
         } catch (queryError) {
-          console.error('查询授权 minter 地址失败:', queryError);
+          console.error('Failed to query authorized minter address:', queryError);
         }
       }
       
-      // 检查实际使用的私钥来源
+      // Check actual private key source used
       const isUsingPromptKey = !!process.env.PROMPT_PRIVATE_KEY;
       
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ 合约调用失败（Gas 估算阶段）');
+      console.error('❌ Contract call failed (Gas estimation phase)');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('当前使用的钱包地址:', wallet.address);
-      console.error('使用的私钥来源:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+      console.error('Current wallet address used:', wallet.address);
+      console.error('Private key source:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY (Prompt Agent)' : 'PAYMENT_PRIVATE_KEY (Generate Agent)');
       if (authorizedMinterAddress) {
-        console.error('合约的授权 minter 地址:', authorizedMinterAddress);
-        console.error('⚠️  地址不匹配！请检查：');
+        console.error('Contract authorized minter address:', authorizedMinterAddress);
+        console.error('⚠️  Address mismatch! Please check:');
         if (isUsingPromptKey) {
-          console.error('   当前使用 PROMPT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
-          console.error('   解决方案：将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+          console.error('   Currently using PROMPT_PRIVATE_KEY, but the address corresponding to this private key is not an authorized minter');
+          console.error('   Solution: Update PROMPT_PRIVATE_KEY environment variable to the private key corresponding to address', authorizedMinterAddress);
         } else {
-          console.error('   当前使用 PAYMENT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
-          console.error('   解决方案：将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+          console.error('   Currently using PAYMENT_PRIVATE_KEY, but the address corresponding to this private key is not an authorized minter');
+          console.error('   Solution: Update PAYMENT_PRIVATE_KEY environment variable to the private key corresponding to address', authorizedMinterAddress);
         }
       }
       console.error('═══════════════════════════════════════════════════════════');
       
-      // 构建详细的错误信息
+      // Build detailed error information
       const detailedError: any = {
         message: errorMessage,
         currentAddress: wallet.address,
@@ -235,9 +235,9 @@ export async function makeContractPayment(
       if (authorizedMinterAddress) {
         detailedError.authorizedMinterAddress = authorizedMinterAddress;
         if (isUsingPromptKey) {
-          detailedError.solution = `请将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+          detailedError.solution = `Please update PROMPT_PRIVATE_KEY environment variable to the private key corresponding to address ${authorizedMinterAddress}`;
         } else {
-          detailedError.solution = `请将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+          detailedError.solution = `Please update PAYMENT_PRIVATE_KEY environment variable to the private key corresponding to address ${authorizedMinterAddress}`;
         }
       }
       
@@ -248,78 +248,78 @@ export async function makeContractPayment(
       };
     }
 
-    // 5. 发送交易，调用合约的 makePayment 方法（设置足够的 gas limit）
+    // 5. Send transaction, call contract's makePayment method (set sufficient gas limit)
     const tx = await wallet.sendTransaction({
       to: targetAddress,
       value,
-      data, // 包含合约方法调用数据
-      gasLimit, // 设置足够的 gas limit
+      data, // Contains contract method call data
+      gasLimit, // Set sufficient gas limit
     });
 
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('✅ 支付交易已发送到合约');
+    console.log('✅ Payment transaction sent to contract');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📝 交易信息:');
-    console.log('  - 交易哈希:', tx.hash);
-    console.log('  - 发送方 (支付钱包):', wallet.address);
-    console.log('  - 接收方 (合约地址):', targetAddress);
-    console.log('  - 支付金额 (BNB):', amount);
+    console.log('📝 Transaction info:');
+    console.log('  - Transaction hash:', tx.hash);
+    console.log('  - Sender (payment wallet):', wallet.address);
+    console.log('  - Recipient (contract address):', targetAddress);
+    console.log('  - Payment amount (BNB):', amount);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🎯 SBT 发放目标钱包地址 (recipient):', recipient);
-    console.log('   ⚠️  合约将向此地址发放 SBT Token');
+    console.log('🎯 SBT issuance target wallet address (recipient):', recipient);
+    console.log('   ⚠️  Contract will issue SBT Token to this address');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('  - Description:', description || '(空字符串)');
-    console.log('  - Referrer:', referrerString || '(空字符串)');
+    console.log('  - Description:', description || '(empty string)');
+    console.log('  - Referrer:', referrerString || '(empty string)');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('⏳ 等待交易确认...');
+    console.log('⏳ Waiting for transaction confirmation...');
 
-    // 6. 等待交易确认（必须等待，确保交易成功）
+    // 6. Wait for transaction confirmation (must wait to ensure transaction success)
     let receipt: ethers.TransactionReceipt | null;
     try {
       receipt = await tx.wait();
       
-      // 检查 receipt 是否为 null
+      // Check if receipt is null
       if (!receipt) {
-        console.error('❌ 交易确认失败: receipt 为 null');
+        console.error('❌ Transaction confirmation failed: receipt is null');
         return {
           success: false,
-          error: '交易已发送但确认失败: receipt 为 null',
-          txHash: tx.hash, // 仍然返回交易哈希，用户可以手动检查
+          error: 'Transaction sent but confirmation failed: receipt is null',
+          txHash: tx.hash, // Still return transaction hash, user can manually check
         };
       }
       
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('✅ 交易已确认');
+      console.log('✅ Transaction confirmed');
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('📋 交易收据信息:');
-      console.log('  - 交易哈希:', receipt.hash);
-      console.log('  - 区块号:', receipt.blockNumber?.toString() || 'N/A');
-      console.log('  - Gas 使用:', receipt.gasUsed?.toString() || 'N/A');
-      console.log('  - 交易状态:', receipt.status === 1 ? '✅ 成功' : '❌ 失败');
+      console.log('📋 Transaction receipt info:');
+      console.log('  - Transaction hash:', receipt.hash);
+      console.log('  - Block number:', receipt.blockNumber?.toString() || 'N/A');
+      console.log('  - Gas used:', receipt.gasUsed?.toString() || 'N/A');
+      console.log('  - Transaction status:', receipt.status === 1 ? '✅ Success' : '❌ Failed');
       console.log('═══════════════════════════════════════════════════════════');
       
-      // 检查交易状态
+      // Check transaction status
       if (receipt.status !== 1) {
-        console.error('❌ 交易失败（状态码:', receipt.status, ')');
-        console.error('交易可能被回退，合约不会有记录');
+        console.error('❌ Transaction failed (status code:', receipt.status, ')');
+        console.error('Transaction may have been reverted, contract will not have record');
         return {
           success: false,
-          error: `交易失败（状态码: ${receipt.status}）。交易可能被回退，请检查合约日志或交易详情。`,
+          error: `Transaction failed (status code: ${receipt.status}). Transaction may have been reverted, please check contract logs or transaction details.`,
         };
       }
       
-      // 解析合约事件（PaymentReceived, SBTMinted）
+      // Parse contract events (PaymentReceived, SBTMinted)
       const contractInterface = new ethers.Interface([
         'event PaymentReceived(uint256 indexed tokenId, address indexed payer, address indexed recipient, uint256 amount, uint256 timestamp)',
         'event SBTMinted(uint256 indexed tokenId, address indexed owner, address indexed recipient, uint256 amount, uint8 rarity)',
       ]);
       
-      console.log('📊 解析合约事件...');
+      console.log('📊 Parsing contract events...');
       for (const log of receipt.logs) {
         try {
           const parsedLog = contractInterface.parseLog(log);
           if (parsedLog) {
-            console.log('  - 事件名称:', parsedLog.name);
+            console.log('  - Event name:', parsedLog.name);
             if (parsedLog.name === 'PaymentReceived') {
               console.log('    - Token ID:', parsedLog.args.tokenId?.toString());
               console.log('    - Payer:', parsedLog.args.payer);
@@ -334,29 +334,29 @@ export async function makeContractPayment(
             }
           }
         } catch (e) {
-          // 忽略无法解析的日志（可能是其他合约的事件）
+          // Ignore logs that cannot be parsed (may be events from other contracts)
         }
       }
       
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('✅ 合约调用成功，SBT 已发放');
+      console.log('✅ Contract call successful, SBT issued');
       console.log('═══════════════════════════════════════════════════════════');
     } catch (waitError: any) {
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ 等待交易确认时发生错误:');
+      console.error('❌ Error while waiting for transaction confirmation:');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('错误类型:', waitError instanceof Error ? waitError.constructor.name : typeof waitError);
-      console.error('错误消息:', waitError instanceof Error ? waitError.message : String(waitError));
+      console.error('Error type:', waitError instanceof Error ? waitError.constructor.name : typeof waitError);
+      console.error('Error message:', waitError instanceof Error ? waitError.message : String(waitError));
       if (waitError instanceof Error && waitError.stack) {
-        console.error('错误堆栈:', waitError.stack);
+        console.error('Error stack:', waitError.stack);
       }
       console.error('═══════════════════════════════════════════════════════════');
       
-      // 即使等待失败，也返回交易哈希（交易可能已经发送）
+      // Even if wait fails, return transaction hash (transaction may have been sent)
       return {
         success: false,
-        error: `交易已发送但确认失败: ${waitError instanceof Error ? waitError.message : '未知错误'}`,
-        txHash: tx.hash, // 仍然返回交易哈希，用户可以手动检查
+        error: `Transaction sent but confirmation failed: ${waitError instanceof Error ? waitError.message : 'Unknown error'}`,
+        txHash: tx.hash, // Still return transaction hash, user can manually check
       };
     }
 
@@ -365,14 +365,14 @@ export async function makeContractPayment(
       txHash: tx.hash,
     };
   } catch (error: any) {
-    console.error('调用智能合约支付时发生错误:', error);
+    console.error('Error occurred while calling smart contract payment:', error);
     
-    // 提取更详细的错误信息
+    // Extract more detailed error information
     let errorMessage = 'Unknown error';
     let authorizedMinterAddress: string | null = null;
     let currentAddress: string | null = null;
     
-    // 尝试获取当前使用的钱包地址
+    // Try to get current wallet address used
     try {
       const config = getPaymentConfig();
       if (config.privateKey) {
@@ -381,19 +381,19 @@ export async function makeContractPayment(
         currentAddress = wallet.address;
       }
     } catch (e) {
-      // 忽略获取地址的错误
+      // Ignore error getting address
     }
     
     if (error instanceof Error) {
       errorMessage = error.message;
       
-      // 如果是合约执行错误，提供更详细的说明
+      // If contract execution error, provide more detailed explanation
       if (error.message.includes('execution reverted')) {
-        errorMessage = '合约执行被回退。可能的原因：1) recipient 地址无效或不允许 2) 合约状态不允许此操作 3) 支付金额不满足合约要求 4) 合约的其他业务逻辑检查失败';
+        errorMessage = 'Contract execution reverted. Possible reasons: 1) recipient address is invalid or not allowed 2) contract state does not allow this operation 3) payment amount does not meet contract requirements 4) other contract business logic checks failed';
       } else if (error.message.includes('insufficient funds')) {
-        errorMessage = '钱包余额不足，无法支付';
+        errorMessage = 'Insufficient wallet balance, cannot pay';
       } else if (error.message.includes('nonce')) {
-        errorMessage = '交易 nonce 错误，请稍后重试';
+        errorMessage = 'Transaction nonce error, please retry later';
       }
     } else if (error?.reason) {
       errorMessage = error.reason;
@@ -401,7 +401,7 @@ export async function makeContractPayment(
       errorMessage = error.message;
     }
     
-    // 如果是 "Only authorized minter" 错误，查询合约的授权 minter 地址
+    // If "Only authorized minter" error, query contract's authorized minter address
     if (errorMessage.includes('Only authorized minter') || errorMessage.includes('authorized minter')) {
       try {
         const config = getPaymentConfig();
@@ -410,37 +410,37 @@ export async function makeContractPayment(
           const provider = new ethers.JsonRpcProvider(config.rpcUrl);
           const contract = new ethers.Contract(targetAddress, ['function authorizedMinter() view returns (address)'], provider);
           authorizedMinterAddress = await contract.authorizedMinter();
-          console.log('查询到合约的授权 minter 地址:', authorizedMinterAddress);
+          console.log('Queried contract authorized minter address:', authorizedMinterAddress);
         }
       } catch (queryError) {
-        console.error('查询授权 minter 地址失败:', queryError);
+        console.error('Failed to query authorized minter address:', queryError);
       }
     }
     
-    // 检查实际使用的私钥来源
+    // Check actual private key source used
     const isUsingPromptKey = !!process.env.PROMPT_PRIVATE_KEY;
     
     console.error('═══════════════════════════════════════════════════════════');
-    console.error('❌ 合约调用失败');
+    console.error('❌ Contract call failed');
     console.error('═══════════════════════════════════════════════════════════');
     if (currentAddress) {
-      console.error('当前使用的钱包地址:', currentAddress);
-      console.error('使用的私钥来源:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY（Prompt Agent）' : 'PAYMENT_PRIVATE_KEY（Generate Agent）');
+      console.error('Current wallet address used:', currentAddress);
+      console.error('Private key source:', isUsingPromptKey ? 'PROMPT_PRIVATE_KEY (Prompt Agent)' : 'PAYMENT_PRIVATE_KEY (Generate Agent)');
     }
     if (authorizedMinterAddress) {
-      console.error('合约的授权 minter 地址:', authorizedMinterAddress);
-      console.error('⚠️  地址不匹配！');
+      console.error('Contract authorized minter address:', authorizedMinterAddress);
+      console.error('⚠️  Address mismatch!');
       if (isUsingPromptKey) {
-        console.error('   当前使用 PROMPT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
-        console.error('   解决方案：将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+        console.error('   Currently using PROMPT_PRIVATE_KEY, but the address corresponding to this private key is not an authorized minter');
+        console.error('   Solution: Update PROMPT_PRIVATE_KEY environment variable to the private key corresponding to address', authorizedMinterAddress);
       } else {
-        console.error('   当前使用 PAYMENT_PRIVATE_KEY，但该私钥对应的地址不是授权的 minter');
-        console.error('   解决方案：将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址', authorizedMinterAddress, '的私钥');
+        console.error('   Currently using PAYMENT_PRIVATE_KEY, but the address corresponding to this private key is not an authorized minter');
+        console.error('   Solution: Update PAYMENT_PRIVATE_KEY environment variable to the private key corresponding to address', authorizedMinterAddress);
       }
     }
     console.error('═══════════════════════════════════════════════════════════');
     
-    // 构建详细的错误信息
+    // Build detailed error information
     const errorDetails: any = {
       message: errorMessage,
     };
@@ -453,9 +453,9 @@ export async function makeContractPayment(
     if (authorizedMinterAddress) {
       errorDetails.authorizedMinterAddress = authorizedMinterAddress;
       if (isUsingPromptKey) {
-        errorDetails.solution = `请将 PROMPT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+        errorDetails.solution = `Please update PROMPT_PRIVATE_KEY environment variable to the private key corresponding to address ${authorizedMinterAddress}`;
       } else {
-        errorDetails.solution = `请将 PAYMENT_PRIVATE_KEY 环境变量更新为对应地址 ${authorizedMinterAddress} 的私钥`;
+        errorDetails.solution = `Please update PAYMENT_PRIVATE_KEY environment variable to the private key corresponding to address ${authorizedMinterAddress}`;
       }
     }
     
@@ -467,7 +467,7 @@ export async function makeContractPayment(
   }
 }
 
-// 直接转账
+// Direct transfer
 export async function makeDirectPayment(
   recipient: string,
   amount: string
@@ -479,17 +479,17 @@ export async function makeDirectPayment(
       return { success: false, error: 'PAYMENT_PRIVATE_KEY not configured' };
     }
 
-    // 1. 创建钱包和提供者
+    // 1. Create wallet and provider
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
     const wallet = new ethers.Wallet(config.privateKey, provider);
 
-    // 2. 发送交易
+    // 2. Send transaction
     const tx = await wallet.sendTransaction({
       to: recipient,
       value: ethers.parseEther(amount),
     });
 
-    console.log('转账交易已发送:', {
+    console.log('Transfer transaction sent:', {
       hash: tx.hash,
       from: wallet.address,
       to: recipient,
@@ -501,7 +501,7 @@ export async function makeDirectPayment(
       txHash: tx.hash,
     };
   } catch (error) {
-    console.error('直接转账时发生错误:', error);
+    console.error('Error occurred during direct transfer:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -509,7 +509,7 @@ export async function makeDirectPayment(
   }
 }
 
-// 获取钱包地址
+// Get wallet address
 export function getWalletAddress(): string | null {
   const config = getPaymentConfig();
   

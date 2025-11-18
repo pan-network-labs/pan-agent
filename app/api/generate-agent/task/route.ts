@@ -1,21 +1,21 @@
 /**
- * Generate Agent Task 端点
+ * Generate Agent Task Endpoint
  * POST /api/generate-agent/task
  * 
- * 处理 HTTP 格式的任务请求
+ * Handle HTTP format task requests
  * 
- * 请求参数（JSON格式）：
+ * Request parameters (JSON format):
  * {
- *   "topic": "string", // 可选，图片主题（如果不提供则使用默认主题）
+ *   "topic": "string", // Optional, image topic (if not provided, use default topic)
  * }
  * 
- * 说明：
- * - 需要先支付（X-PAYMENT 机制），否则返回 402 状态码
- * - Generate Agent 会自动调用 Prompt Agent 获取 prompt，并自动支付给 Prompt Agent（0.01 BNB）
- * - 使用通义万相 wan2.5-t2i-preview 模型生成图片
- * - 图片尺寸固定为：1024*1024，水印：false
- * - 需要配置环境变量：QWEN_API_KEY、PAYMENT_PRIVATE_KEY、PAYMENT_CONTRACT_ADDRESS
- * - 可选环境变量：PROMPT_AGENT_URL（如果不设置，会自动使用当前请求的域名构建）
+ * Notes:
+ * - Payment required first (X-PAYMENT mechanism), otherwise returns 402 status code
+ * - Generate Agent will automatically call Prompt Agent to get prompt and automatically pay Prompt Agent (0.01 BNB)
+ * - Uses Tongyi Wanxiang wan2.5-t2i-preview model to generate images
+ * - Image size fixed at: 1024*1024, watermark: false
+ * - Required environment variables: QWEN_API_KEY, PAYMENT_PRIVATE_KEY, PAYMENT_CONTRACT_ADDRESS
+ * - Optional environment variable: PROMPT_AGENT_URL (if not set, will automatically use current request domain to build)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,7 +23,7 @@ import { ethers } from 'ethers';
 import { createX402Response } from '../../x402-utils';
 import { callPromptAgentWithPayment } from '../../a2a-agent/agent-client';
 
-// CORS响应头配置（允许所有来源）
+// CORS response headers configuration (allow all origins)
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -33,14 +33,14 @@ function getCorsHeaders() {
   };
 }
 
-// 获取支付验证配置（从环境变量）
-// 环境变量中的价格应该是 Wei 格式（字符串）
+// Get payment validation configuration (from environment variables)
+// Price in environment variables should be in Wei format (string)
 function getPaymentConfig() {
-  // 如果环境变量是 BNB 格式（如 "0.005"），转换为 Wei；如果已经是 Wei 格式，直接使用
-  const priceEnv = process.env.PAYMENT_PRICE || '5000000000000000'; // 默认 0.005 BNB = 5000000000000000 Wei
+  // If environment variable is in BNB format (e.g., "0.005"), convert to Wei; if already in Wei format, use directly
+  const priceEnv = process.env.PAYMENT_PRICE || '5000000000000000'; // Default 0.005 BNB = 5000000000000000 Wei
   const minAmountEnv = process.env.PAYMENT_MIN_AMOUNT || process.env.PAYMENT_PRICE || '5000000000000000';
   
-  // 判断是 BNB 格式还是 Wei 格式（BNB 格式通常小于 1e15，Wei 格式通常大于 1e15）
+  // Determine if BNB format or Wei format (BNB format usually < 1e15, Wei format usually > 1e15)
   const priceWei = parseFloat(priceEnv) < 1e15 
     ? ethers.parseEther(priceEnv).toString() 
     : priceEnv;
@@ -49,42 +49,42 @@ function getPaymentConfig() {
     : minAmountEnv;
   
   // ============================================================================
-  // 【重要】Generate Agent 收款地址配置说明：
+  // 【Important】Generate Agent Payment Address Configuration:
   // ============================================================================
-  // PAYMENT_ADDRESS: 普通钱包地址（用户支付给 Generate Agent）
-  //   - 用途：用户直接转账给 Generate Agent 的收款地址（不通过合约）
-  //   - 功能：接收用户支付，Generate Agent 收到后会自动调用 Prompt Agent
-  //   - 说明：用户支付给 Generate Agent 是直接转账，不通过智能合约
-  //   - 示例：0x74cc09316deab81ee874839e1da9e84ec066369c
+  // PAYMENT_ADDRESS: Regular wallet address (user pays Generate Agent)
+  //   - Purpose: Address for user to directly transfer to Generate Agent (not through contract)
+  //   - Function: Receive user payment, Generate Agent will automatically call Prompt Agent after receiving
+  //   - Note: User payment to Generate Agent is direct transfer, not through smart contract
+  //   - Example: 0x74cc09316deab81ee874839e1da9e84ec066369c
   //
-  // 注意：Generate Agent 不使用 PAYMENT_CONTRACT_ADDRESS
-  //      PAYMENT_CONTRACT_ADDRESS 用于 Generate Agent 支付给 Prompt Agent（通过合约）
+  // Note: Generate Agent does not use PAYMENT_CONTRACT_ADDRESS
+  //       PAYMENT_CONTRACT_ADDRESS is used for Generate Agent to pay Prompt Agent (through contract)
   // ============================================================================
   const paymentAddress = process.env.PAYMENT_ADDRESS || '0x74cc09316deab81ee874839e1da9e84ec066369c';
   
-  // 记录使用的地址类型（用于调试）
-  console.log(`📋 Generate Agent 收款地址配置: PAYMENT_ADDRESS（普通钱包）`);
-  console.log(`   用途：用户直接转账给 Generate Agent 的收款地址`);
-  console.log(`   地址: ${paymentAddress}`);
-  console.log(`   注意：Generate Agent 支付给 Prompt Agent 使用 PAYMENT_CONTRACT_ADDRESS（智能合约）`);
+  // Log address type used (for debugging)
+  console.log(`📋 Generate Agent payment address configuration: PAYMENT_ADDRESS (regular wallet)`);
+  console.log(`   Purpose: Address for user to directly transfer to Generate Agent`);
+  console.log(`   Address: ${paymentAddress}`);
+  console.log(`   Note: Generate Agent uses PAYMENT_CONTRACT_ADDRESS (smart contract) to pay Prompt Agent`);
   
   const config = {
-    price: priceWei, // Wei 格式
+    price: priceWei, // Wei format
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
     network: process.env.PAYMENT_NETWORK || 'BSCTest',
-    address: paymentAddress, // 用户支付给 Generate Agent 的地址（普通钱包）
-    minAmount: minAmountWei, // Wei 格式
+    address: paymentAddress, // Address for user to pay Generate Agent (regular wallet)
+    minAmount: minAmountWei, // Wei format
     rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
   };
 
   return config;
 }
 
-// 验证支付信息
+// Validate payment information
 async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: boolean; userAddress?: string; error?: any }> {
   const PAYMENT_CONFIG = getPaymentConfig();
 
-  // 1. 检查是否有 X-PAYMENT 请求头
+  // 1. Check if X-PAYMENT header exists
   if (!xPaymentHeader) {
     return {
       valid: false,
@@ -98,180 +98,180 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
   }
 
   try {
-    // 2. Base64 解码获取交易哈希
+    // 2. Base64 decode to get transaction hash
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('🔍 Generate Agent 开始验证支付');
+    console.log('🔍 Generate Agent starting payment validation');
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📋 接收到的 X-PAYMENT 头:', xPaymentHeader);
+    console.log('📋 Received X-PAYMENT header:', xPaymentHeader);
     
     const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
-    console.log('📝 Base64 解码后的交易哈希:', tsHash);
+    console.log('📝 Base64 decoded transaction hash:', tsHash);
     
-    // 3. 连接 BSC Testnet
-    console.log('🌐 连接 RPC 节点:', PAYMENT_CONFIG.rpcUrl);
+    // 3. Connect to BSC Testnet
+    console.log('🌐 Connecting to RPC node:', PAYMENT_CONFIG.rpcUrl);
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     
-    // 4. 查询交易信息
-    console.log('🔎 查询交易信息...');
+    // 4. Query transaction information
+    console.log('🔎 Querying transaction information...');
     const tx = await provider.getTransaction(tsHash);
     if (!tx) {
-      console.error('❌ 交易不存在:', tsHash);
-      return { valid: false, error: '交易不存在' };
+      console.error('❌ Transaction does not exist:', tsHash);
+      return { valid: false, error: 'Transaction does not exist' };
     }
 
-    // 5. 等待交易确认并获取收据
-    console.log('⏳ 等待交易确认...');
+    // 5. Wait for transaction confirmation and get receipt
+    console.log('⏳ Waiting for transaction confirmation...');
     const receipt = await provider.getTransactionReceipt(tsHash);
     if (!receipt) {
-      console.error('❌ 交易尚未确认:', tsHash);
-      return { valid: false, error: '交易尚未确认' };
+      console.error('❌ Transaction not yet confirmed:', tsHash);
+      return { valid: false, error: 'Transaction not yet confirmed' };
     }
 
-    // 6. 打印交易信息
+    // 6. Print transaction information
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📊 交易信息:');
-    console.log('  - 交易哈希:', tsHash);
-    console.log('  - 发送方:', tx.from);
-    console.log('  - 接收方（合约地址）:', tx.to);
-    console.log('  - 交易金额 (Wei):', tx.value.toString());
-    console.log('  - 交易金额 (BNB):', ethers.formatEther(tx.value));
-    console.log('  - 交易状态:', receipt.status === 1 ? '✅ 成功' : '❌ 失败');
-    console.log('  - 区块号:', receipt.blockNumber?.toString() || 'N/A');
+    console.log('📊 Transaction information:');
+    console.log('  - Transaction hash:', tsHash);
+    console.log('  - Sender:', tx.from);
+    console.log('  - Recipient (contract address):', tx.to);
+    console.log('  - Transaction amount (Wei):', tx.value.toString());
+    console.log('  - Transaction amount (BNB):', ethers.formatEther(tx.value));
+    console.log('  - Transaction status:', receipt.status === 1 ? '✅ Success' : '❌ Failed');
+    console.log('  - Block number:', receipt.blockNumber?.toString() || 'N/A');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // 7. 验证收款地址和金额（使用 Wei 格式比较）
+    // 7. Validate recipient address and amount (compare using Wei format)
     const expectedAddress = PAYMENT_CONFIG.address.toLowerCase();
     const amountWei = BigInt(tx.value.toString());
     const minAmountWei = BigInt(PAYMENT_CONFIG.minAmount);
 
-    // 验证交易的 to 地址
-    // Generate Agent 收款：用户直接转账到 PAYMENT_ADDRESS（普通钱包地址）
-    // 注意：Generate Agent 不使用智能合约收款，用户是直接转账
+    // Validate transaction to address
+    // Generate Agent receives payment: user directly transfers to PAYMENT_ADDRESS (regular wallet address)
+    // Note: Generate Agent does not use smart contract to receive payment, user transfers directly
     const toAddress = tx.to?.toLowerCase();
     const isValidRecipient = toAddress === expectedAddress;
     
-    console.log('🔐 验证收款地址（用户直接转账给 Generate Agent）:');
-    console.log('  - 期望地址（PAYMENT_ADDRESS）:', expectedAddress);
-    console.log('  - 实际交易接收地址:', toAddress);
-    console.log('  - 匹配结果:', isValidRecipient ? '✅ 匹配' : '❌ 不匹配');
-    console.log('  - 环境变量 PAYMENT_ADDRESS:', process.env.PAYMENT_ADDRESS || '(未设置，使用默认值)');
-    console.log('  - 说明：用户直接转账给 Generate Agent，不通过智能合约');
+    console.log('🔐 Validating recipient address (user direct transfer to Generate Agent):');
+    console.log('  - Expected address (PAYMENT_ADDRESS):', expectedAddress);
+    console.log('  - Actual transaction recipient address:', toAddress);
+    console.log('  - Match result:', isValidRecipient ? '✅ Match' : '❌ Mismatch');
+    console.log('  - Environment variable PAYMENT_ADDRESS:', process.env.PAYMENT_ADDRESS || '(not set, using default)');
+    console.log('  - Note: User directly transfers to Generate Agent, not through smart contract');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('💰 验证支付金额:');
-    console.log('  - 期望最小金额 (Wei):', PAYMENT_CONFIG.minAmount);
-    console.log('  - 期望最小金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
-    console.log('  - 实际支付金额 (Wei):', amountWei.toString());
-    console.log('  - 实际支付金额 (BNB):', ethers.formatEther(amountWei.toString()));
-    console.log('  - 金额是否足够:', amountWei >= minAmountWei ? '✅ 足够' : '❌ 不足');
+    console.log('💰 Validating payment amount:');
+    console.log('  - Expected minimum amount (Wei):', PAYMENT_CONFIG.minAmount);
+    console.log('  - Expected minimum amount (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
+    console.log('  - Actual payment amount (Wei):', amountWei.toString());
+    console.log('  - Actual payment amount (BNB):', ethers.formatEther(amountWei.toString()));
+    console.log('  - Is amount sufficient:', amountWei >= minAmountWei ? '✅ Sufficient' : '❌ Insufficient');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     if (!isValidRecipient) {
-      console.error('❌ 收款地址不匹配');
-      console.error('  期望:', expectedAddress);
-      console.error('  实际:', toAddress);
-      return { valid: false, error: `收款地址不匹配（期望: ${expectedAddress}, 实际: ${toAddress}）` };
+      console.error('❌ Recipient address mismatch');
+      console.error('  Expected:', expectedAddress);
+      console.error('  Actual:', toAddress);
+      return { valid: false, error: `Recipient address mismatch (expected: ${expectedAddress}, actual: ${toAddress})` };
     }
 
     if (amountWei < minAmountWei) {
-      console.error('❌ 交易金额不足');
-      console.error('  期望 >=', ethers.formatEther(PAYMENT_CONFIG.minAmount), 'BNB');
-      console.error('  实际:', ethers.formatEther(tx.value.toString()), 'BNB');
-      return { valid: false, error: `交易金额不足（期望 >= ${ethers.formatEther(PAYMENT_CONFIG.minAmount)} BNB, 实际 ${ethers.formatEther(tx.value.toString())} BNB）` };
+      console.error('❌ Insufficient transaction amount');
+      console.error('  Expected >=', ethers.formatEther(PAYMENT_CONFIG.minAmount), 'BNB');
+      console.error('  Actual:', ethers.formatEther(tx.value.toString()), 'BNB');
+      return { valid: false, error: `Insufficient transaction amount (expected >= ${ethers.formatEther(PAYMENT_CONFIG.minAmount)} BNB, actual ${ethers.formatEther(tx.value.toString())} BNB)` };
     }
 
-    // 9. 验证交易是否成功
+    // 9. Validate if transaction succeeded
     if (receipt.status !== 1) {
-      console.error('❌ 交易失败（状态码:', receipt.status, ')');
-      return { valid: false, error: '交易失败' };
+      console.error('❌ Transaction failed (status code:', receipt.status, ')');
+      return { valid: false, error: 'Transaction failed' };
     }
 
-    // 10. 返回用户地址（用于后续给用户发放 SBT）
-    console.log('✅ 支付验证成功');
-    console.log('  - 用户地址:', tx.from);
+    // 10. Return user address (for subsequent SBT issuance to user)
+    console.log('✅ Payment validation successful');
+    console.log('  - User address:', tx.from);
     console.log('═══════════════════════════════════════════════════════════');
     return { valid: true, userAddress: tx.from };
   } catch (error) {
     console.error('═══════════════════════════════════════════════════════════');
-    console.error('❌ 支付验证错误:');
-    console.error('  错误类型:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('  错误消息:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Payment validation error:');
+    console.error('  Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('  Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.stack) {
-      console.error('  错误堆栈:', error.stack);
+      console.error('  Error stack:', error.stack);
     }
     console.error('═══════════════════════════════════════════════════════════');
     return {
       valid: false,
-      error: error instanceof Error ? error.message : '支付验证失败',
+      error: error instanceof Error ? error.message : 'Payment validation failed',
     };
   }
 }
 
-// 处理预检请求（OPTIONS）
+// Handle preflight requests (OPTIONS)
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
-// 从请求头中获取正确的域名（支持 Vercel）
+// Get correct domain from request headers (supports Vercel)
 function getBaseUrl(request: NextRequest): string {
-  // 1. 优先使用生产环境 URL（避免预览部署 URL 的身份验证问题）
-  // 检查是否是预览部署 URL（包含随机字符串）
+  // 1. Prioritize production URL (avoid authentication issues with preview deployment URLs)
+  // Check if it's a preview deployment URL (contains random string)
   const forwardedHost = request.headers.get('x-forwarded-host');
   const host = request.headers.get('host');
   
-  // 如果是预览部署 URL（包含随机字符串），使用生产环境 URL
+  // If it's a preview deployment URL (contains random string), use production URL
   const isPreviewDeployment = (forwardedHost || host || '').match(/^[a-z0-9-]+-[a-z0-9]+-[a-z0-9]+\.vercel\.app$/);
   
   if (isPreviewDeployment) {
-    console.log('检测到预览部署 URL，使用生产环境 URL');
+    console.log('Detected preview deployment URL, using production URL');
     return 'https://pan-agent.vercel.app';
   }
   
-  // 2. 使用 x-forwarded-host（Vercel 会设置）
+  // 2. Use x-forwarded-host (Vercel will set this)
   if (forwardedHost) {
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     return `${protocol}://${forwardedHost}`;
   }
   
-  // 3. 使用 host 头
+  // 3. Use host header
   if (host) {
     const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
     return `${protocol}://${host}`;
   }
   
-  // 4. 使用 Vercel 环境变量（如果可用且不是预览部署）
+  // 4. Use Vercel environment variable (if available and not preview deployment)
   if (process.env.VERCEL_URL && !process.env.VERCEL_URL.match(/^[a-z0-9-]+-[a-z0-9]+-[a-z0-9]+\.vercel\.app$/)) {
     return `https://${process.env.VERCEL_URL}`;
   }
   
-  // 5. 从 request.url 中提取（备用）
+  // 5. Extract from request.url (fallback)
   try {
     const url = new URL(request.url);
-    // 如果 URL 包含 localhost，说明可能是开发环境，否则使用 URL 的 host
+    // If URL contains localhost, it's likely a development environment, otherwise use URL's host
     if (!url.host.includes('localhost')) {
       return `${url.protocol}//${url.host}`;
     }
   } catch (e) {
-    // 忽略错误
+    // Ignore error
   }
   
-  // 6. 最后的备用方案：使用生产环境 URL
+  // 6. Final fallback: use production URL
   return 'https://pan-agent.vercel.app';
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. 支付验证（在函数最开始）
+    // 1. Payment validation (at the beginning of function)
     const PAYMENT_CONFIG = getPaymentConfig();
     const xPaymentHeader = request.headers.get('X-PAYMENT');
     
-    // 获取当前请求的 URL 作为 resource
+    // Get current request URL as resource
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // 从查询参数中获取 referrer（推广人地址）
+    // Get referrer from query parameters (referrer address)
     const referrer = requestUrl.searchParams.get('referrer') || undefined;
 
-    // 如果 X-PAYMENT 没有信息，直接返回 402 和支付信息（x402 标准格式）
+    // If X-PAYMENT has no information, directly return 402 and payment information (x402 standard format)
     if (!xPaymentHeader) {
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
@@ -281,17 +281,17 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: 'Payment required to generate image',
         mimeType: 'application/json',
-        referrer: referrer, // 如果有 referrer，包含在响应中
+        referrer: referrer, // Include referrer in response if present
       });
       
-      console.log('Generate Agent 返回 402 响应（合约交易信息）:');
-      console.log('完整 x402 响应:', JSON.stringify(x402Response, null, 2));
-      console.log('合约地址:', PAYMENT_CONFIG.address);
-      console.log('支付金额 (Wei):', PAYMENT_CONFIG.price);
-      console.log('支付金额 (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
-      console.log('货币:', PAYMENT_CONFIG.currency);
-      console.log('网络:', PAYMENT_CONFIG.network);
-      console.log('Referrer:', referrer || '(空字符串)');
+      console.log('Generate Agent returning 402 response (contract transaction info):');
+      console.log('Full x402 response:', JSON.stringify(x402Response, null, 2));
+      console.log('Contract address:', PAYMENT_CONFIG.address);
+      console.log('Payment amount (Wei):', PAYMENT_CONFIG.price);
+      console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
+      console.log('Currency:', PAYMENT_CONFIG.currency);
+      console.log('Network:', PAYMENT_CONFIG.network);
+      console.log('Referrer:', referrer || '(empty string)');
       console.log('Resource:', resource);
       
       return NextResponse.json(
@@ -303,31 +303,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 如果有 X-PAYMENT 信息，验证支付
+    // If X-PAYMENT has information, validate payment
     const paymentValidation = await validatePayment(xPaymentHeader);
     
-    // 获取用户地址（从支付交易中）
+    // Get user address (from payment transaction)
     const userAddress = paymentValidation.userAddress;
     
     if (!paymentValidation.valid) {
-      // 验证失败时返回 402 和支付信息（x402 标准格式）
+      // Return 402 and payment information when validation fails (x402 standard format)
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('❌ Generate Agent 支付验证失败，返回 402 响应');
+      console.log('❌ Generate Agent payment validation failed, returning 402 response');
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('📋 验证失败原因:', paymentValidation.error);
-      console.log('📋 验证错误详情:', JSON.stringify(paymentValidation.error, null, 2));
+      console.log('📋 Validation failure reason:', paymentValidation.error);
+      console.log('📋 Validation error details:', JSON.stringify(paymentValidation.error, null, 2));
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('💰 期望的支付信息:');
-      console.log('  - 合约地址:', PAYMENT_CONFIG.address);
-      console.log('  - 支付金额 (Wei):', PAYMENT_CONFIG.price);
-      console.log('  - 支付金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.price));
-      console.log('  - 最小金额 (Wei):', PAYMENT_CONFIG.minAmount);
-      console.log('  - 最小金额 (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
-      console.log('  - 货币:', PAYMENT_CONFIG.currency);
-      console.log('  - 网络:', PAYMENT_CONFIG.network);
+      console.log('💰 Expected payment information:');
+      console.log('  - Contract address:', PAYMENT_CONFIG.address);
+      console.log('  - Payment amount (Wei):', PAYMENT_CONFIG.price);
+      console.log('  - Payment amount (BNB):', ethers.formatEther(PAYMENT_CONFIG.price));
+      console.log('  - Minimum amount (Wei):', PAYMENT_CONFIG.minAmount);
+      console.log('  - Minimum amount (BNB):', ethers.formatEther(PAYMENT_CONFIG.minAmount));
+      console.log('  - Currency:', PAYMENT_CONFIG.currency);
+      console.log('  - Network:', PAYMENT_CONFIG.network);
       console.log('═══════════════════════════════════════════════════════════');
       
-      // 构建错误信息
+      // Build error message
       const errorMessage = typeof paymentValidation.error === 'string' 
         ? paymentValidation.error 
         : JSON.stringify(paymentValidation.error);
@@ -340,9 +340,9 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: `Payment validation failed: ${errorMessage}`,
         mimeType: 'application/json',
-        referrer: referrer, // 如果有 referrer，包含在响应中
-        error: errorMessage, // 错误信息
-        errorDetails: paymentValidation.error, // 错误详情
+        referrer: referrer, // Include referrer in response if present
+        error: errorMessage, // Error message
+        errorDetails: paymentValidation.error, // Error details
       });
       
       return NextResponse.json(
@@ -354,68 +354,68 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 调用 Prompt Agent 获取 prompt（自动处理支付流程）
-    // 流程：先调用 → 收到 402 → 解析支付信息 → 向智能合约支付（传入用户地址作为 recipient） → 重新调用
-    // 使用默认主题，让 Prompt Agent 自动生成 prompt
+    // 2. Call Prompt Agent to get prompt (automatically handles payment flow)
+    // Flow: Call first → Receive 402 → Parse payment info → Pay smart contract (pass user address as recipient) → Call again
+    // Use default topic, let Prompt Agent automatically generate prompt
     let finalPrompt: string;
-    let sbtRarity: string | null = null; // SBT 级别（N、R、S）
+    let sbtRarity: string | null = null; // SBT level (N, R, S)
     try {
-      // 获取 Prompt Agent URL（优先使用环境变量，否则使用当前请求的域名自动构建）
-      // 使用 getBaseUrl 函数获取正确的域名（支持 Vercel）
+      // Get Prompt Agent URL (prioritize environment variable, otherwise auto-build using current request domain)
+      // Use getBaseUrl function to get correct domain (supports Vercel)
       const baseUrl = getBaseUrl(request);
-      // 如果 PROMPT_AGENT_URL 包含 localhost，说明是开发环境配置，在生产环境应该忽略
+      // If PROMPT_AGENT_URL contains localhost, it's a development environment config, should ignore in production
       const envPromptAgentUrl = process.env.PROMPT_AGENT_URL;
       const agentUrl = (envPromptAgentUrl && !envPromptAgentUrl.includes('localhost')) 
         ? envPromptAgentUrl 
         : `${baseUrl}/api/prompt-agent`;
       
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('🔗 Generate Agent 准备调用 Prompt Agent');
+      console.log('🔗 Generate Agent preparing to call Prompt Agent');
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('当前请求 URL:', requestUrl.toString());
-      console.log('VERCEL_URL 环境变量:', process.env.VERCEL_URL || '(未设置)');
-      console.log('请求头 x-forwarded-host:', request.headers.get('x-forwarded-host') || '(未设置)');
-      console.log('请求头 host:', request.headers.get('host') || '(未设置)');
-      console.log('请求头 x-forwarded-proto:', request.headers.get('x-forwarded-proto') || '(未设置)');
-      console.log('Base URL (计算后):', baseUrl);
-      console.log('PROMPT_AGENT_URL 环境变量:', envPromptAgentUrl || '(未设置)');
-      console.log('PROMPT_AGENT_URL 是否包含 localhost:', envPromptAgentUrl?.includes('localhost') ? '是（将被忽略）' : '否');
-      console.log('最终使用的 Prompt Agent URL:', agentUrl);
+      console.log('Current request URL:', requestUrl.toString());
+      console.log('VERCEL_URL environment variable:', process.env.VERCEL_URL || '(not set)');
+      console.log('Request header x-forwarded-host:', request.headers.get('x-forwarded-host') || '(not set)');
+      console.log('Request header host:', request.headers.get('host') || '(not set)');
+      console.log('Request header x-forwarded-proto:', request.headers.get('x-forwarded-proto') || '(not set)');
+      console.log('Base URL (calculated):', baseUrl);
+      console.log('PROMPT_AGENT_URL environment variable:', envPromptAgentUrl || '(not set)');
+      console.log('Does PROMPT_AGENT_URL contain localhost:', envPromptAgentUrl?.includes('localhost') ? 'Yes (will be ignored)' : 'No');
+      console.log('Final Prompt Agent URL used:', agentUrl);
       console.log('═══════════════════════════════════════════════════════════');
       
-      // 使用默认主题，Prompt Agent 会自动生成 prompt
-      const defaultTopic = '一幅美丽的抽象艺术作品';
+      // Use default topic, Prompt Agent will automatically generate prompt
+      const defaultTopic = 'A beautiful abstract artwork';
       
-      // 调用 Prompt Agent（自动处理支付流程，传入用户地址用于发放 SBT）
-      // 从请求 URL 中获取 referrer，传递给 Prompt Agent
+      // Call Prompt Agent (automatically handles payment flow, pass user address for SBT issuance)
+      // Get referrer from request URL, pass to Prompt Agent
       const referrer = requestUrl.searchParams.get('referrer') || '';
       
-      console.log('Generate Agent 调用 Prompt Agent，传递的 referrer:', referrer || '(空字符串)');
+      console.log('Generate Agent calling Prompt Agent, referrer passed:', referrer || '(empty string)');
       
       const promptResult = await callPromptAgentWithPayment(
         agentUrl,
         defaultTopic,
-        '抽象',
-        '色彩丰富，充满创意',
-        userAddress, // 传入用户地址，用于给用户发放 SBT
-        referrer || undefined // 传递 referrer 给 Prompt Agent（Prompt Agent 会将其包含在 402 响应中）
+        'abstract',
+        'rich in color, full of creativity',
+        userAddress, // Pass user address for SBT issuance to user
+        referrer || undefined // Pass referrer to Prompt Agent (Prompt Agent will include it in 402 response)
       );
 
       if (!promptResult.success || !promptResult.prompt) {
-        // 检查是否是 Prompt Agent 返回的 402 错误（这是 Agent 间的支付问题，不应该返回给用户）
+        // Check if it's a 402 error from Prompt Agent (this is an inter-agent payment issue, should not return to user)
         if (promptResult.error?.status === 402 || (promptResult.error?.data && typeof promptResult.error.data === 'object' && promptResult.error.data.x402Version)) {
-          // 这是 Prompt Agent 的 402 响应，不应该返回给用户
-          // 这是 Generate Agent 内部的支付问题，应该返回 500 错误
-          console.error('调用 Prompt Agent 失败: Prompt Agent 返回 402（这是 Generate Agent 内部的支付问题）');
-          console.error('Prompt Agent 402 响应:', JSON.stringify(promptResult.error?.data || promptResult.error, null, 2));
+          // This is Prompt Agent's 402 response, should not return to user
+          // This is Generate Agent's internal payment issue, should return 500 error
+          console.error('Failed to call Prompt Agent: Prompt Agent returned 402 (this is Generate Agent internal payment issue)');
+          console.error('Prompt Agent 402 response:', JSON.stringify(promptResult.error?.data || promptResult.error, null, 2));
           return NextResponse.json(
             {
               code: 500,
-              msg: '调用 Prompt Agent 失败: 内部支付处理异常，请稍后重试',
+              msg: 'Failed to call Prompt Agent: Internal payment processing exception, please retry later',
               data: {
                 error: {
                   type: 'Prompt Agent 402 Error',
-                  message: 'Generate Agent 向 Prompt Agent 支付验证失败（内部支付问题）',
+                  message: 'Generate Agent payment validation to Prompt Agent failed (internal payment issue)',
                   details: promptResult.error?.data || promptResult.error,
                 },
               },
@@ -427,19 +427,19 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // 提取错误信息（包括合约支付错误）
-        const errorMessage = promptResult.error?.message || promptResult.error || '调用 Prompt Agent 失败';
+        // Extract error information (including contract payment errors)
+        const errorMessage = promptResult.error?.message || promptResult.error || 'Failed to call Prompt Agent';
         const errorType = promptResult.error?.type || 'Unknown Error';
         const errorDetails = promptResult.error?.details || promptResult.error?.data || promptResult;
         
-        console.error('调用 Prompt Agent 失败:', errorMessage);
-        console.error('错误类型:', errorType);
-        console.error('错误详情:', JSON.stringify(errorDetails, null, 2));
+        console.error('Failed to call Prompt Agent:', errorMessage);
+        console.error('Error type:', errorType);
+        console.error('Error details:', JSON.stringify(errorDetails, null, 2));
         
         return NextResponse.json(
           {
             code: 500,
-            msg: `调用 Prompt Agent 失败: ${errorMessage}`,
+            msg: `Failed to call Prompt Agent: ${errorMessage}`,
             data: {
               error: {
                 type: errorType,
@@ -456,21 +456,21 @@ export async function POST(request: NextRequest) {
       }
 
       finalPrompt = promptResult.prompt;
-      sbtRarity = promptResult.rarity || null; // 获取 SBT 级别（N、R、S）
-      console.log('从 Prompt Agent 获取的 prompt:', finalPrompt);
-      console.log('SBT 级别:', sbtRarity || '未返回');
+      sbtRarity = promptResult.rarity || null; // Get SBT level (N, R, S)
+      console.log('Prompt obtained from Prompt Agent:', finalPrompt);
+      console.log('SBT level:', sbtRarity || 'not returned');
     } catch (error) {
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ Generate Agent 调用 Prompt Agent 时发生异常错误:');
+      console.error('❌ Exception error occurred when Generate Agent called Prompt Agent:');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('错误类型:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('错误消息:', error instanceof Error ? error.message : String(error));
+      console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
       if (error instanceof Error && error.stack) {
-        console.error('错误堆栈:', error.stack);
+        console.error('Error stack:', error.stack);
       }
       console.error('═══════════════════════════════════════════════════════════');
       
-      // 构建详细的错误信息（返回给客户端）
+      // Build detailed error information (return to client)
       const errorDetails = error instanceof Error ? {
         name: error.name,
         message: error.message,
@@ -484,7 +484,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           code: 500,
-          msg: `调用 Prompt Agent 失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          msg: `Failed to call Prompt Agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
           data: {
             error: errorDetails,
           },
@@ -496,13 +496,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 调用通义万相生成图片（异步API）
+    // 3. Call Tongyi Wanxiang to generate image (async API)
     const qwenApiKey = process.env.QWEN_API_KEY;
     if (!qwenApiKey) {
       return NextResponse.json(
         {
           code: 500,
-          msg: 'QWEN_API_KEY 环境变量未配置',
+          msg: 'QWEN_API_KEY environment variable not configured',
           data: null,
         },
         {
@@ -512,15 +512,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 构建完整的 prompt
+    // Build complete prompt
     const fullPrompt = `${finalPrompt}`;
     
-    console.log('调用通义万相生成图片，完整 prompt:', fullPrompt);
-    console.log('使用模型: wan2.5-t2i-preview');
-    console.log('分辨率: 1024*1024');
-    console.log('水印: false');
+    console.log('Calling Tongyi Wanxiang to generate image, full prompt:', fullPrompt);
+    console.log('Using model: wan2.5-t2i-preview');
+    console.log('Resolution: 1024*1024');
+    console.log('Watermark: false');
 
-    // 步骤1：创建异步任务（新加坡地域）
+    // Step 1: Create async task (Singapore region)
     const createTaskResponse = await fetch('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis', {
       method: 'POST',
       headers: {
@@ -543,11 +543,11 @@ export async function POST(request: NextRequest) {
 
     if (!createTaskResponse.ok) {
       const errorText = await createTaskResponse.text();
-      console.error('通义万相创建任务失败:', errorText);
+      console.error('Tongyi Wanxiang task creation failed:', errorText);
       return NextResponse.json(
         {
           code: 500,
-          msg: `通义万相创建任务失败: ${errorText}`,
+          msg: `Tongyi Wanxiang task creation failed: ${errorText}`,
           data: null,
         },
         {
@@ -561,11 +561,11 @@ export async function POST(request: NextRequest) {
     const taskId = createTaskData.output?.task_id;
     
     if (!taskId) {
-      console.error('通义万相响应格式错误（缺少 task_id）:', createTaskData);
+      console.error('Tongyi Wanxiang response format error (missing task_id):', createTaskData);
       return NextResponse.json(
         {
           code: 500,
-          msg: '通义万相响应格式错误（缺少 task_id）',
+          msg: 'Tongyi Wanxiang response format error (missing task_id)',
           data: null,
         },
         {
@@ -575,12 +575,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('任务创建成功，task_id:', taskId);
-    console.log('开始轮询任务结果...');
+    console.log('Task created successfully, task_id:', taskId);
+    console.log('Starting to poll task results...');
 
-    // 步骤2：轮询获取任务结果
-    const maxAttempts = 60; // 最多轮询60次（约2分钟）
-    const pollInterval = 2000; // 每2秒轮询一次
+    // Step 2: Poll to get task results
+    const maxAttempts = 60; // Maximum 60 polling attempts (about 2 minutes)
+    const pollInterval = 2000; // Poll every 2 seconds
     let imageUrl: string | null = null;
     let attempts = 0;
 
@@ -598,27 +598,27 @@ export async function POST(request: NextRequest) {
 
       if (!queryResponse.ok) {
         const errorText = await queryResponse.text();
-        console.error(`查询任务结果失败（第${attempts}次）:`, errorText);
+        console.error(`Failed to query task results (attempt ${attempts}):`, errorText);
         continue;
       }
 
       const queryData = await queryResponse.json();
       const taskStatus = queryData.output?.task_status;
 
-      console.log(`第${attempts}次查询，任务状态:`, taskStatus);
+      console.log(`Query attempt ${attempts}, task status:`, taskStatus);
 
       if (taskStatus === 'SUCCEEDED') {
         const results = queryData.output?.results;
         if (results && results[0] && results[0].url) {
           imageUrl = results[0].url;
-          console.log('图片生成成功，URL:', imageUrl);
+          console.log('Image generated successfully, URL:', imageUrl);
           break;
         } else {
-          console.error('任务成功但响应格式错误（缺少 url）:', queryData);
+          console.error('Task succeeded but response format error (missing url):', queryData);
           return NextResponse.json(
             {
               code: 500,
-              msg: '任务成功但响应格式错误（缺少 url）',
+              msg: 'Task succeeded but response format error (missing url)',
               data: null,
             },
             {
@@ -628,11 +628,11 @@ export async function POST(request: NextRequest) {
           );
         }
       } else if (taskStatus === 'FAILED') {
-        console.error('任务失败:', queryData);
+        console.error('Task failed:', queryData);
         return NextResponse.json(
           {
             code: 500,
-            msg: `图片生成任务失败: ${queryData.output?.message || '未知错误'}`,
+            msg: `Image generation task failed: ${queryData.output?.message || 'Unknown error'}`,
             data: null,
           },
           {
@@ -641,19 +641,19 @@ export async function POST(request: NextRequest) {
           }
         );
       } else if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
-        // 继续等待
+        // Continue waiting
         continue;
       } else {
-        console.warn('未知的任务状态:', taskStatus);
+        console.warn('Unknown task status:', taskStatus);
       }
     }
 
     if (!imageUrl) {
-      console.error('任务超时，未获取到图片URL');
+      console.error('Task timeout, image URL not obtained');
       return NextResponse.json(
         {
           code: 500,
-          msg: '图片生成超时，请稍后重试',
+          msg: 'Image generation timeout, please retry later',
           data: null,
         },
         {
@@ -663,14 +663,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. 返回成功响应（包含 SBT 级别信息）
+    // 4. Return success response (includes SBT level information)
     return NextResponse.json(
       {
         code: 200,
         msg: 'success',
         data: {
           data: imageUrl,
-          rarity: sbtRarity || null, // 返回 SBT 级别（N、R、S）
+          rarity: sbtRarity || null, // Return SBT level (N, R, S)
         },
       },
       {
@@ -678,11 +678,11 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('处理请求时发生错误:', error);
+    console.error('Error processing request:', error);
     return NextResponse.json(
       {
         code: 500,
-        msg: error instanceof Error ? error.message : '未知错误',
+        msg: error instanceof Error ? error.message : 'Unknown error',
         data: null,
       },
       {

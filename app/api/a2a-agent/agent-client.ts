@@ -1,6 +1,6 @@
 /**
- * A2A Agent 客户端工具
- * 用于调用其他 A2A Agent
+ * A2A Agent Client Utilities
+ * For calling other A2A Agents
  */
 
 export interface A2AAgentCallOptions {
@@ -8,11 +8,11 @@ export interface A2AAgentCallOptions {
   method: string;
   params: any;
   id?: number | string;
-  xPayment?: string; // X-PAYMENT 请求头（用于支付验证）
+  xPayment?: string; // X-PAYMENT request header (for payment validation)
 }
 
 /**
- * 调用其他 A2A Agent
+ * Call other A2A Agent
  */
 export async function callA2AAgent(
   options: A2AAgentCallOptions
@@ -20,27 +20,27 @@ export async function callA2AAgent(
   try {
     const { agentUrl, method, params, id = Date.now(), xPayment } = options;
 
-    // 构建 HTTP 请求（使用查询参数 ?action=method）
+    // Build HTTP request (using query parameter ?action=method)
     const url = `${agentUrl}/task?action=${encodeURIComponent(method)}`;
 
-    // 构建请求头
+    // Build request headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    // 如果提供了 X-PAYMENT，添加到请求头
+    // If X-PAYMENT is provided, add to request headers
     if (xPayment) {
       headers['X-PAYMENT'] = xPayment;
     }
 
-    // 调用 Agent 的 task 端点
+    // Call Agent's task endpoint
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(params || {}),
     });
 
-    // 检查响应状态和 Content-Type
+    // Check response status and Content-Type
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
     
@@ -49,32 +49,32 @@ export async function callA2AAgent(
       if (isJson) {
         result = await response.json();
       } else {
-        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        // If not JSON, read text first (may be HTML error page)
         const text = await response.text();
-        console.error('A2A Agent 返回了非 JSON 响应:');
-        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        console.error('A2A Agent returned non-JSON response:');
+        console.error('Response text (first 500 chars):', text.substring(0, 500));
         
-        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        // Try to parse as JSON (Content-Type may be set incorrectly)
         try {
           result = JSON.parse(text);
         } catch (parseError) {
-          // 确实是 HTML 或其他非 JSON 格式
-          throw new Error(`A2A Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+          // Indeed HTML or other non-JSON format
+          throw new Error(`A2A Agent returned non-JSON response (status code: ${response.status}, Content-Type: ${contentType}). Endpoint may not exist or returned error page. Response content: ${text.substring(0, 200)}`);
         }
       }
     } catch (parseError) {
-      console.error('解析 A2A Agent 响应失败:', parseError);
-      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+      console.error('Failed to parse A2A Agent response:', parseError);
+      throw parseError instanceof Error ? parseError : new Error(`Failed to parse response: ${String(parseError)}`);
     }
 
-    // 处理 402 状态码（需要支付）
+    // Handle 402 status code (payment required)
     if (response.status === 402) {
       return {
         success: false,
         error: {
           code: 402,
           message: 'Payment Required',
-          data: result, // x402 响应
+          data: result, // x402 response
         },
       };
     }
@@ -90,7 +90,7 @@ export async function callA2AAgent(
       };
     }
 
-    // 检查响应格式：{ code: 200, msg: "success", data: {...} }
+    // Check response format: { code: 200, msg: "success", data: {...} }
     if (result.code === 200) {
       return {
         success: true,
@@ -98,7 +98,7 @@ export async function callA2AAgent(
       };
     }
 
-    // 错误响应
+    // Error response
     return {
       success: false,
       error: {
@@ -108,27 +108,27 @@ export async function callA2AAgent(
       },
     };
   } catch (error) {
-    console.error('调用 A2A Agent 时发生错误:', error);
+    console.error('Error occurred when calling A2A Agent:', error);
     return {
       success: false,
       error: {
         code: 500,
         message: 'Internal error',
-        data: error instanceof Error ? error.message : '未知错误',
+        data: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
 }
 
 /**
- * 获取 Agent Card
- * 使用 A2A 协议标准路径：/.well-known/agent.json
+ * Get Agent Card
+ * Use A2A protocol standard path: /.well-known/agent.json
  */
 export async function getAgentCard(agentUrl: string): Promise<{ success: boolean; card?: any; error?: any }> {
-  // 清理 URL，移除末尾的斜杠和路径
+  // Clean URL, remove trailing slashes and paths
   const baseUrl = agentUrl.replace(/\/+$/, '').replace(/\/task$/, '').replace(/\/\.well-known\/agent\.json\/?$/, '');
   
-  // 使用 A2A 协议标准路径
+  // Use A2A protocol standard path
   const standardPath = `${baseUrl}/.well-known/agent.json`;
 
   try {
@@ -142,7 +142,7 @@ export async function getAgentCard(agentUrl: string): Promise<{ success: boolean
     if (response.ok) {
       const card = await response.json();
       
-      // 验证是否是有效的 Agent Card
+      // Validate if it's a valid Agent Card
       if (card && (card['@type'] === 'Agent' || card.name || card.capabilities)) {
         return {
           success: true,
@@ -151,13 +151,13 @@ export async function getAgentCard(agentUrl: string): Promise<{ success: boolean
       }
     }
 
-    // 响应不成功或不是有效的 Agent Card
+    // Response not successful or not a valid Agent Card
     return {
       success: false,
       error: {
         code: -32603,
         message: 'Agent Card not found',
-        data: `无法找到 Agent Card，已尝试标准路径：${standardPath}`,
+        data: `Unable to find Agent Card, tried standard path: ${standardPath}`,
       },
     };
   } catch (error) {
@@ -166,28 +166,28 @@ export async function getAgentCard(agentUrl: string): Promise<{ success: boolean
       error: {
         code: -32603,
         message: 'Agent Card not found',
-        data: error instanceof Error ? error.message : `无法访问 Agent Card 标准路径：${standardPath}`,
+        data: error instanceof Error ? error.message : `Unable to access Agent Card standard path: ${standardPath}`,
       },
     };
   }
 }
 
 /**
- * 从端点 URL 推断 Agent 的基础 URL
- * 例如：从 /api/a2a-agent/task 推断出 /api/a2a-agent
+ * Infer Agent base URL from endpoint URL
+ * Example: Infer /api/a2a-agent from /api/a2a-agent/task
  */
 export function inferAgentBaseUrl(endpointUrl: string): string {
-  // 从端点 URL 推断基础 URL
-  // 例如：从 /api/a2a-agent/task 推断出 /api/a2a-agent
+  // Infer base URL from endpoint URL
+  // Example: Infer /api/a2a-agent from /api/a2a-agent/task
   return endpointUrl
-    .replace(/\/+$/, '') // 移除末尾斜杠
-    .replace(/\/task\/?$/, '') // 移除 /task
-    .replace(/\/\.well-known\/agent\.json\/?$/, ''); // 移除 /.well-known/agent.json
+    .replace(/\/+$/, '') // Remove trailing slash
+    .replace(/\/task\/?$/, '') // Remove /task
+    .replace(/\/\.well-known\/agent\.json\/?$/, ''); // Remove /.well-known/agent.json
 }
 
 /**
- * 智能发现 Agent Card
- * 如果提供了 task 端点，会自动推断 Agent Card 的位置
+ * Intelligently discover Agent Card
+ * If task endpoint is provided, will automatically infer Agent Card location
  */
 export async function discoverAgentCard(
   endpointUrl: string
@@ -197,38 +197,38 @@ export async function discoverAgentCard(
 }
 
 /**
- * 调用 Prompt Agent 生成 prompt（自动处理支付）
- * 流程：
- * 1. 先调用 Prompt Agent（不带 X-PAYMENT）
- * 2. 如果返回 402，解析 x402 响应获取地址和金额
- * 3. 向智能合约支付（传入用户地址作为 recipient，用于发放 SBT）
- * 4. 重新调用 Prompt Agent，带上 X-PAYMENT 头
+ * Call Prompt Agent to generate prompt (automatically handles payment)
+ * Flow:
+ * 1. Call Prompt Agent first (without X-PAYMENT)
+ * 2. If returns 402, parse x402 response to get address and amount
+ * 3. Pay smart contract (pass user address as recipient for SBT issuance)
+ * 4. Call Prompt Agent again with X-PAYMENT header
  * 
- * 注意：Prompt Agent 现在是 HTTP 格式（非 JSON-RPC），直接返回 x402 格式
+ * Note: Prompt Agent is now HTTP format (not JSON-RPC), directly returns x402 format
  */
 export async function callPromptAgentWithPayment(
   promptAgentUrl: string,
   topic: string,
   style?: string,
   additionalRequirements?: string,
-  userAddress?: string, // 用户地址（用于给用户发放 SBT）
-  referrer?: string // 可选：推广人（从 Generate Agent 的请求 URL 中获取）
+  userAddress?: string, // User address (for SBT issuance to user)
+  referrer?: string // Optional: Referrer (obtained from Generate Agent's request URL)
 ): Promise<{ success: boolean; prompt?: string; rarity?: string; error?: any }> {
   try {
-    // 1. 先调用 Prompt Agent（不带 X-PAYMENT，HTTP 格式）
-    // 如果提供了 referrer，将其添加到 URL 查询参数中
+    // 1. Call Prompt Agent first (without X-PAYMENT, HTTP format)
+    // If referrer is provided, add it to URL query parameters
     let requestUrl = `${promptAgentUrl}/task`;
     if (referrer) {
       requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
     }
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📞 Generate Agent 调用 Prompt Agent');
+    console.log('📞 Generate Agent calling Prompt Agent');
     console.log('═══════════════════════════════════════════════════════════');
     console.log('Prompt Agent URL:', promptAgentUrl);
-    console.log('完整请求 URL:', requestUrl);
-    console.log('Referrer (传递给 Prompt Agent):', referrer || '(空字符串)');
-    console.log('请求参数:', { topic, style, additionalRequirements });
+    console.log('Full request URL:', requestUrl);
+    console.log('Referrer (passed to Prompt Agent):', referrer || '(empty string)');
+    console.log('Request parameters:', { topic, style, additionalRequirements });
     console.log('═══════════════════════════════════════════════════════════');
     
     let response: Response;
@@ -237,7 +237,7 @@ export async function callPromptAgentWithPayment(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // 不传递 X-PAYMENT，让 Prompt Agent 返回 402
+          // Do not pass X-PAYMENT, let Prompt Agent return 402
         },
         body: JSON.stringify({
           topic,
@@ -246,109 +246,109 @@ export async function callPromptAgentWithPayment(
         }),
       });
     } catch (fetchError) {
-      // fetch 失败，可能是网络错误或 URL 错误
+      // fetch failed, may be network error or URL error
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ Fetch 请求失败:');
+      console.error('❌ Fetch request failed:');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('请求 URL:', requestUrl);
+      console.error('Request URL:', requestUrl);
       console.error('Prompt Agent URL:', promptAgentUrl);
-      console.error('错误类型:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
-      console.error('错误消息:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      console.error('Error type:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
+      console.error('Error message:', fetchError instanceof Error ? fetchError.message : String(fetchError));
       if (fetchError instanceof Error && fetchError.stack) {
-        console.error('错误堆栈:', fetchError.stack);
+        console.error('Error stack:', fetchError.stack);
       }
       console.error('═══════════════════════════════════════════════════════════');
       
-      throw new Error(`无法连接到 Prompt Agent (${requestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
+      throw new Error(`Unable to connect to Prompt Agent (${requestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
     }
 
-    // 检查响应状态和 Content-Type
+    // Check response status and Content-Type
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
     
-    console.log('Prompt Agent 响应状态:', response.status);
-    console.log('Prompt Agent 响应 Content-Type:', contentType);
-    console.log('是否为 JSON:', isJson);
+    console.log('Prompt Agent response status:', response.status);
+    console.log('Prompt Agent response Content-Type:', contentType);
+    console.log('Is JSON:', isJson);
     
     let result: any;
     try {
       if (isJson) {
         result = await response.json();
       } else {
-        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        // If not JSON, read text first (may be HTML error page)
         const text = await response.text();
-        console.error('Prompt Agent 返回了非 JSON 响应:');
-        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        console.error('Prompt Agent returned non-JSON response:');
+        console.error('Response text (first 500 chars):', text.substring(0, 500));
         
-        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        // Try to parse as JSON (Content-Type may be set incorrectly)
         try {
           result = JSON.parse(text);
         } catch (parseError) {
-          // 确实是 HTML 或其他非 JSON 格式
-          throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+          // Indeed HTML or other non-JSON format
+          throw new Error(`Prompt Agent returned non-JSON response (status code: ${response.status}, Content-Type: ${contentType}). Endpoint may not exist or returned error page. Response content: ${text.substring(0, 200)}`);
         }
       }
     } catch (parseError) {
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ 解析 Prompt Agent 响应失败:');
+      console.error('❌ Failed to parse Prompt Agent response:');
       console.error('═══════════════════════════════════════════════════════════');
-      console.error('请求 URL:', requestUrl);
-      console.error('响应状态:', response.status);
-      console.error('响应 Content-Type:', contentType);
-      console.error('错误类型:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
-      console.error('错误消息:', parseError instanceof Error ? parseError.message : String(parseError));
+      console.error('Request URL:', requestUrl);
+      console.error('Response status:', response.status);
+      console.error('Response Content-Type:', contentType);
+      console.error('Error type:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
+      console.error('Error message:', parseError instanceof Error ? parseError.message : String(parseError));
       if (parseError instanceof Error && parseError.stack) {
-        console.error('错误堆栈:', parseError.stack);
+        console.error('Error stack:', parseError.stack);
       }
       console.error('═══════════════════════════════════════════════════════════');
       
-      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+      throw parseError instanceof Error ? parseError : new Error(`Failed to parse response: ${String(parseError)}`);
     }
     
-    console.log('Prompt Agent 响应数据:', JSON.stringify(result, null, 2));
+    console.log('Prompt Agent response data:', JSON.stringify(result, null, 2));
 
-    // 2. 如果成功，直接返回（适配新的返回格式）
-    // 新格式：{ "code": 200, "msg": "success", "data": { "data": "提示词", "rarity": "N" } }
+    // 2. If successful, return directly (adapt to new response format)
+    // New format: { "code": 200, "msg": "success", "data": { "data": "prompt", "rarity": "N" } }
     if (response.ok && result.code === 200 && result.msg === 'success' && result.data) {
-      console.log('Prompt Agent 直接返回成功（可能不需要支付）');
-      const prompt = result.data.data; // 从新格式中提取提示词
-      const rarity = result.data.rarity; // 获取 SBT 级别
-      console.log('提取的提示词:', prompt);
-      console.log('SBT 级别:', rarity);
+      console.log('Prompt Agent directly returned success (may not need payment)');
+      const prompt = result.data.data; // Extract prompt from new format
+      const rarity = result.data.rarity; // Get SBT level
+      console.log('Extracted prompt:', prompt);
+      console.log('SBT level:', rarity);
       return {
         success: true,
         prompt: prompt,
-        rarity: rarity, // 可选：返回 SBT 级别
+        rarity: rarity, // Optional: return SBT level
       };
     }
     
-    // 兼容旧格式（如果 Prompt Agent 还在使用旧格式）
+    // Compatible with old format (if Prompt Agent is still using old format)
     if (response.ok && result.success && result.prompt) {
-      console.log('Prompt Agent 返回旧格式（兼容处理）');
+      console.log('Prompt Agent returned old format (compatibility handling)');
       return {
         success: true,
         prompt: result.prompt,
       };
     }
 
-    // 3. 检查是否是 402 错误（需要支付）
+    // 3. Check if it's a 402 error (payment required)
     if (response.status === 402) {
-      console.log('收到 402 响应，需要支付给 Prompt Agent');
-      // 解析 x402 响应
-      // Prompt Agent 返回的 402 响应格式（HTTP 格式，直接返回 x402）：
+      console.log('Received 402 response, need to pay Prompt Agent');
+      // Parse x402 response
+      // Prompt Agent's 402 response format (HTTP format, directly returns x402):
       // {
       //   "x402Version": 1,
       //   "accepts": [...]
       // }
       const x402Data = result;
       
-      console.log('Prompt Agent 402 响应完整数据:', JSON.stringify(x402Data, null, 2));
+      console.log('Prompt Agent 402 response full data:', JSON.stringify(x402Data, null, 2));
       
       if (!x402Data || !x402Data.x402Version || !x402Data.accepts || x402Data.accepts.length === 0) {
         return {
           success: false,
           error: {
-            message: '无法解析 x402 支付信息',
+            message: 'Unable to parse x402 payment information',
             data: x402Data,
           },
         };
@@ -357,17 +357,17 @@ export async function callPromptAgentWithPayment(
       const requirement = x402Data.accepts[0];
       const address = requirement.address || '';
       const amountWei = requirement.maxAmountRequired || '';
-      // 解析 referrer（从 ext.referrer 字段）
+      // Parse referrer (from ext.referrer field)
       const referrer = requirement.ext?.referrer || '';
 
-      console.log('从 402 响应中解析的合约交易信息:');
-      console.log('完整 requirement:', JSON.stringify(requirement, null, 2));
-      console.log('合约地址:', address);
-      console.log('支付金额 (Wei):', amountWei);
-      console.log('支付金额 (BNB):', amountWei ? (BigInt(amountWei) / BigInt(1e18)).toString() : 'N/A');
-      console.log('货币:', requirement.currency || 'N/A');
-      console.log('网络:', requirement.network || 'N/A');
-      console.log('Referrer (从 ext.referrer):', referrer || '(空字符串)');
+      console.log('Contract transaction information parsed from 402 response:');
+      console.log('Full requirement:', JSON.stringify(requirement, null, 2));
+      console.log('Contract address:', address);
+      console.log('Payment amount (Wei):', amountWei);
+      console.log('Payment amount (BNB):', amountWei ? (BigInt(amountWei) / BigInt(1e18)).toString() : 'N/A');
+      console.log('Currency:', requirement.currency || 'N/A');
+      console.log('Network:', requirement.network || 'N/A');
+      console.log('Referrer (from ext.referrer):', referrer || '(empty string)');
       console.log('Resource:', requirement.resource || 'N/A');
       console.log('Description:', requirement.description || 'N/A');
 
@@ -375,61 +375,61 @@ export async function callPromptAgentWithPayment(
         return {
           success: false,
           error: {
-            message: 'x402 响应中缺少地址或金额信息',
+            message: 'Missing address or amount information in x402 response',
             data: requirement,
           },
         };
       }
 
-      // 验证用户地址
+      // Validate user address
       if (!userAddress) {
         return {
           success: false,
           error: {
-            message: '用户地址未提供，无法发放 SBT',
+            message: 'User address not provided, cannot issue SBT',
             data: null,
           },
         };
       }
 
-      // 4. 向智能合约支付（Agent 间支付，不发放 SBT）
-      // 重要：这是 Generate Agent 支付给 Prompt Agent，不是用户支付
-      // 所以不应该给用户发放 SBT，应该使用直接转账到合约地址
+      // 4. Pay smart contract (inter-agent payment, do not issue SBT)
+      // Important: This is Generate Agent paying Prompt Agent, not user payment
+      // So should not issue SBT to user, should use direct transfer to contract address
       const { makeDirectPayment } = await import('../payment/simple');
       
-      // 将 Wei 转换为 BNB 格式（用于 makeDirectPayment）
+      // Convert Wei to BNB format (for makeDirectPayment)
       const { ethers } = await import('ethers');
       const amountBNB = ethers.formatEther(amountWei);
       
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('💰 Generate Agent 支付给 Prompt Agent（Agent 间支付）');
+      console.log('💰 Generate Agent paying Prompt Agent (inter-agent payment)');
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('⚠️  这是 Agent 间支付，不发放 SBT');
-      console.log('合约地址:', address);
-      console.log('支付金额 (BNB):', amountBNB);
-      console.log('支付金额 (Wei):', amountWei);
+      console.log('⚠️  This is inter-agent payment, do not issue SBT');
+      console.log('Contract address:', address);
+      console.log('Payment amount (BNB):', amountBNB);
+      console.log('Payment amount (Wei):', amountWei);
       console.log('═══════════════════════════════════════════════════════════');
       
-      console.log('调用 makeDirectPayment（直接转账到合约地址，不发放 SBT）...');
+      console.log('Calling makeDirectPayment (direct transfer to contract address, do not issue SBT)...');
       const paymentResult = await makeDirectPayment(
-        address, // 直接转账到合约地址（合约的 receive() 函数会接收）
+        address, // Direct transfer to contract address (contract's receive() function will receive)
         amountBNB
       );
       
-      console.log('直接转账结果:', paymentResult);
+      console.log('Direct transfer result:', paymentResult);
 
       if (!paymentResult.success || !paymentResult.txHash) {
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('❌ 直接转账失败:');
+        console.error('❌ Direct transfer failed:');
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('错误信息:', paymentResult.error || '支付失败');
-        console.error('完整结果:', JSON.stringify(paymentResult, null, 2));
+        console.error('Error message:', paymentResult.error || 'Payment failed');
+        console.error('Full result:', JSON.stringify(paymentResult, null, 2));
         console.error('═══════════════════════════════════════════════════════════');
         
         return {
           success: false,
           error: {
-            message: paymentResult.error || '直接转账失败',
+            message: paymentResult.error || 'Direct transfer failed',
             data: paymentResult,
             type: 'Direct Payment Error',
             details: {
@@ -440,19 +440,19 @@ export async function callPromptAgentWithPayment(
         };
       }
 
-      // 5. 等待交易确认
+      // 5. Wait for transaction confirmation
       const provider = new ethers.JsonRpcProvider(
         process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/'
       );
       
       let receipt = null;
       let attempts = 0;
-      const maxAttempts = 30; // 最多等待 30 次（约 60 秒）
+      const maxAttempts = 30; // Maximum 30 attempts (about 60 seconds)
       
       while (!receipt && attempts < maxAttempts) {
         receipt = await provider.getTransactionReceipt(paymentResult.txHash);
         if (!receipt) {
-          await new Promise((resolve) => setTimeout(resolve, 2000)); // 等待 2 秒
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
           attempts++;
         }
       }
@@ -461,26 +461,26 @@ export async function callPromptAgentWithPayment(
         return {
           success: false,
           error: {
-            message: '支付交易确认超时',
+            message: 'Payment transaction confirmation timeout',
             data: { txHash: paymentResult.txHash },
           },
         };
       }
 
-      // 6. 将交易哈希编码为 Base64（用于 X-PAYMENT 头）
+      // 6. Encode transaction hash as Base64 (for X-PAYMENT header)
       const xPayment = Buffer.from(paymentResult.txHash, 'utf-8').toString('base64');
 
-      // 7. 重新调用 Prompt Agent，带上 X-PAYMENT 头（HTTP 格式）
-      // 重要：在请求体中传递 userAddress，因为 X-PAYMENT 中的交易是 Generate Agent 发起的，
-      // 所以 tx.from 是 Generate Agent 的地址，不是用户的地址
+      // 7. Call Prompt Agent again with X-PAYMENT header (HTTP format)
+      // Important: Pass userAddress in request body, because the transaction in X-PAYMENT was initiated by Generate Agent,
+      // so tx.from is Generate Agent's address, not user's address
       const secondRequestUrl = `${promptAgentUrl}/task`;
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('📞 Generate Agent 第二次调用 Prompt Agent（带 X-PAYMENT）');
+      console.log('📞 Generate Agent second call to Prompt Agent (with X-PAYMENT)');
       console.log('═══════════════════════════════════════════════════════════');
-      console.log('请求 URL:', secondRequestUrl);
+      console.log('Request URL:', secondRequestUrl);
       console.log('X-PAYMENT (Base64):', xPayment);
-      console.log('交易哈希:', Buffer.from(xPayment, 'base64').toString('utf-8'));
-      console.log('用户地址 (在请求体中传递):', userAddress);
+      console.log('Transaction hash:', Buffer.from(xPayment, 'base64').toString('utf-8'));
+      console.log('User address (passed in request body):', userAddress);
       console.log('═══════════════════════════════════════════════════════════');
       
       let secondResponse: Response;
@@ -489,105 +489,105 @@ export async function callPromptAgentWithPayment(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-PAYMENT': xPayment, // 传递支付信息
+            'X-PAYMENT': xPayment, // Pass payment information
           },
           body: JSON.stringify({
             topic,
             style,
             additionalRequirements,
-            userAddress, // 重要：传递用户地址，因为 X-PAYMENT 中的交易是 Generate Agent 发起的
+            userAddress, // Important: Pass user address, because the transaction in X-PAYMENT was initiated by Generate Agent
           }),
         });
       } catch (fetchError) {
-        // fetch 失败，可能是网络错误或 URL 错误
+        // fetch failed, may be network error or URL error
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('❌ 第二次 Fetch 请求失败:');
+        console.error('❌ Second fetch request failed:');
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('请求 URL:', secondRequestUrl);
+        console.error('Request URL:', secondRequestUrl);
         console.error('Prompt Agent URL:', promptAgentUrl);
-        console.error('错误类型:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
-        console.error('错误消息:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+        console.error('Error type:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
+        console.error('Error message:', fetchError instanceof Error ? fetchError.message : String(fetchError));
         if (fetchError instanceof Error && fetchError.stack) {
-          console.error('错误堆栈:', fetchError.stack);
+          console.error('Error stack:', fetchError.stack);
         }
         console.error('═══════════════════════════════════════════════════════════');
         
-        throw new Error(`无法连接到 Prompt Agent (${secondRequestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
+        throw new Error(`Unable to connect to Prompt Agent (${secondRequestUrl}): ${fetchError instanceof Error ? fetchError.message : 'fetch failed'}`);
       }
 
-      // 检查响应状态和 Content-Type
+      // Check response status and Content-Type
       const secondContentType = secondResponse.headers.get('content-type') || '';
       const secondIsJson = secondContentType.includes('application/json');
       
-      console.log('Prompt Agent 第二次调用响应状态:', secondResponse.status);
-      console.log('Prompt Agent 第二次调用响应 Content-Type:', secondContentType);
-      console.log('是否为 JSON:', secondIsJson);
+      console.log('Prompt Agent second call response status:', secondResponse.status);
+      console.log('Prompt Agent second call response Content-Type:', secondContentType);
+      console.log('Is JSON:', secondIsJson);
       
       let secondResult: any;
       try {
         if (secondIsJson) {
           secondResult = await secondResponse.json();
         } else {
-          // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+          // If not JSON, read text first (may be HTML error page)
           const text = await secondResponse.text();
-          console.error('Prompt Agent 第二次调用返回了非 JSON 响应:');
-          console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+          console.error('Prompt Agent second call returned non-JSON response:');
+          console.error('Response text (first 500 chars):', text.substring(0, 500));
           
-          // 尝试解析为 JSON（可能 Content-Type 设置错误）
+          // Try to parse as JSON (Content-Type may be set incorrectly)
           try {
             secondResult = JSON.parse(text);
           } catch (parseError) {
-            // 确实是 HTML 或其他非 JSON 格式
-            throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${secondResponse.status}，Content-Type: ${secondContentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+            // Indeed HTML or other non-JSON format
+            throw new Error(`Prompt Agent returned non-JSON response (status code: ${secondResponse.status}, Content-Type: ${secondContentType}). Endpoint may not exist or returned error page. Response content: ${text.substring(0, 200)}`);
           }
         }
       } catch (parseError) {
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('❌ 解析 Prompt Agent 第二次调用响应失败:');
+        console.error('❌ Failed to parse Prompt Agent second call response:');
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('请求 URL:', secondRequestUrl);
-        console.error('响应状态:', secondResponse.status);
-        console.error('响应 Content-Type:', secondContentType);
-        console.error('错误类型:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
-        console.error('错误消息:', parseError instanceof Error ? parseError.message : String(parseError));
+        console.error('Request URL:', secondRequestUrl);
+        console.error('Response status:', secondResponse.status);
+        console.error('Response Content-Type:', secondContentType);
+        console.error('Error type:', parseError instanceof Error ? parseError.constructor.name : typeof parseError);
+        console.error('Error message:', parseError instanceof Error ? parseError.message : String(parseError));
         if (parseError instanceof Error && parseError.stack) {
-          console.error('错误堆栈:', parseError.stack);
+          console.error('Error stack:', parseError.stack);
         }
         console.error('═══════════════════════════════════════════════════════════');
         
-        throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+        throw parseError instanceof Error ? parseError : new Error(`Failed to parse response: ${String(parseError)}`);
       }
       
-      console.log('Prompt Agent 第二次调用响应数据:', JSON.stringify(secondResult, null, 2));
+      console.log('Prompt Agent second call response data:', JSON.stringify(secondResult, null, 2));
 
-      // 适配新的返回格式：{ "code": 200, "msg": "success", "data": { "data": "提示词", "rarity": "N" } }
+      // Adapt to new response format: { "code": 200, "msg": "success", "data": { "data": "prompt", "rarity": "N" } }
       if (secondResponse.ok && secondResult.code === 200 && secondResult.msg === 'success' && secondResult.data) {
-        const prompt = secondResult.data.data; // 从新格式中提取提示词
-        const rarity = secondResult.data.rarity; // 获取 SBT 级别
-        console.log('✅ Prompt Agent 返回成功（新格式）');
-        console.log('提取的提示词:', prompt);
-        console.log('SBT 级别:', rarity);
+        const prompt = secondResult.data.data; // Extract prompt from new format
+        const rarity = secondResult.data.rarity; // Get SBT level
+        console.log('✅ Prompt Agent returned success (new format)');
+        console.log('Extracted prompt:', prompt);
+        console.log('SBT level:', rarity);
         return {
           success: true,
           prompt: prompt,
-          rarity: rarity, // 可选：返回 SBT 级别
+          rarity: rarity, // Optional: return SBT level
         };
       }
       
-      // 兼容旧格式
+      // Compatible with old format
       if (secondResponse.ok && secondResult.success && secondResult.prompt) {
-        console.log('✅ Prompt Agent 返回成功（旧格式，兼容处理）');
+        console.log('✅ Prompt Agent returned success (old format, compatibility handling)');
         return {
           success: true,
           prompt: secondResult.prompt,
         };
       }
 
-      // 处理错误情况
-      // 检查是否是新格式的错误响应：{ "code": 非200, "msg": "错误信息", "data": null }
+      // Handle error cases
+      // Check if it's new format error response: { "code": non-200, "msg": "error message", "data": null }
       if (secondResult.code && secondResult.code !== 200) {
-        const errorMessage = secondResult.msg || '调用 Prompt Agent 失败';
-        console.error('Prompt Agent 返回错误（新格式）:', {
+        const errorMessage = secondResult.msg || 'Failed to call Prompt Agent';
+        console.error('Prompt Agent returned error (new format):', {
           code: secondResult.code,
           msg: errorMessage,
           data: secondResult.data,
@@ -603,16 +603,16 @@ export async function callPromptAgentWithPayment(
       }
       
       if (!secondResponse.ok || !secondResult.success) {
-        // 提取错误信息
-        let errorMessage = '调用 Prompt Agent 失败';
+        // Extract error information
+        let errorMessage = 'Failed to call Prompt Agent';
         
-        // 如果是 402 错误，说明支付验证失败（这是 Generate Agent 内部的支付问题）
+        // If it's a 402 error, payment validation failed (this is Generate Agent's internal payment issue)
         if (secondResponse.status === 402) {
-          // Prompt Agent 返回 402，说明 Generate Agent 的支付验证失败
-          // 这是 Agent 间的支付问题，不应该传播给用户
-          errorMessage = 'Generate Agent 向 Prompt Agent 支付验证失败（内部支付问题）';
-          console.error('⚠️ Generate Agent 向 Prompt Agent 支付验证失败:');
-          console.error('Prompt Agent 402 响应:', JSON.stringify(secondResult, null, 2));
+          // Prompt Agent returned 402, Generate Agent's payment validation failed
+          // This is an inter-agent payment issue, should not propagate to user
+          errorMessage = 'Generate Agent payment validation to Prompt Agent failed (internal payment issue)';
+          console.error('⚠️ Generate Agent payment validation to Prompt Agent failed:');
+          console.error('Prompt Agent 402 response:', JSON.stringify(secondResult, null, 2));
         } else if (secondResult.error) {
           if (typeof secondResult.error === 'string') {
             errorMessage = secondResult.error;
@@ -623,7 +623,7 @@ export async function callPromptAgentWithPayment(
           } else if (secondResult.error.msg) {
             errorMessage = secondResult.error.msg;
           } else if (secondResult.error.data) {
-            // 如果 data 是对象，尝试提取更详细的信息
+            // If data is an object, try to extract more detailed information
             const data = secondResult.error.data;
             if (typeof data === 'object' && data !== null) {
               if (data.message) {
@@ -640,24 +640,24 @@ export async function callPromptAgentWithPayment(
         } else if (secondResult.msg) {
           errorMessage = secondResult.msg;
         } else if (!secondResult.success && secondResult.prompt === undefined) {
-          // 如果没有 success 字段且没有 prompt，可能是其他错误
-          errorMessage = `Prompt Agent 返回错误: ${JSON.stringify(secondResult)}`;
+          // If no success field and no prompt, may be other error
+          errorMessage = `Prompt Agent returned error: ${JSON.stringify(secondResult)}`;
         }
         
-        console.error('Prompt Agent 第二次调用失败:', {
+        console.error('Prompt Agent second call failed:', {
           status: secondResponse.status,
           error: errorMessage,
           response: secondResult,
         });
         
-        // 如果 Prompt Agent 返回 402，这是 Generate Agent 内部的支付问题
-        // 不应该将 Prompt Agent 的 402 响应传播给用户
-        // 如果 secondResult 是 x402 格式，不应该包含在错误数据中
+        // If Prompt Agent returns 402, this is Generate Agent's internal payment issue
+        // Should not propagate Prompt Agent's 402 response to user
+        // If secondResult is x402 format, should not include in error data
         let errorData = secondResult.error || secondResult;
         if (secondResponse.status === 402 && errorData && typeof errorData === 'object' && errorData.x402Version) {
-          // 这是 x402 格式的响应，不应该传播给用户
-          // 只返回错误消息，不包含 x402 响应数据
-          errorData = { message: 'Prompt Agent 支付验证失败（内部支付问题）' };
+          // This is x402 format response, should not propagate to user
+          // Only return error message, do not include x402 response data
+          errorData = { message: 'Prompt Agent payment validation failed (internal payment issue)' };
         }
         
         return {
@@ -676,8 +676,8 @@ export async function callPromptAgentWithPayment(
       };
     }
 
-    // 其他错误（非 402 错误）
-    let errorMessage = '调用 Prompt Agent 失败';
+    // Other errors (non-402 errors)
+    let errorMessage = 'Failed to call Prompt Agent';
     if (result.error) {
       if (typeof result.error === 'string') {
         errorMessage = result.error;
@@ -701,16 +701,16 @@ export async function callPromptAgentWithPayment(
     };
   } catch (error) {
     console.error('═══════════════════════════════════════════════════════════');
-    console.error('❌ 调用 Prompt Agent 时发生异常错误:');
+    console.error('❌ Exception error occurred when calling Prompt Agent:');
     console.error('═══════════════════════════════════════════════════════════');
-    console.error('错误类型:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('错误消息:', error instanceof Error ? error.message : String(error));
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.stack) {
-      console.error('错误堆栈:', error.stack);
+      console.error('Error stack:', error.stack);
     }
     console.error('═══════════════════════════════════════════════════════════');
     
-    // 构建详细的错误信息（返回给客户端）
+    // Build detailed error information (return to client)
     const errorDetails = error instanceof Error ? {
       name: error.name,
       message: error.message,
@@ -725,8 +725,8 @@ export async function callPromptAgentWithPayment(
       success: false,
       error: {
         code: -32603,
-        message: `Internal error: ${error instanceof Error ? error.message : '未知错误'}`,
-        data: error instanceof Error ? error.message : '未知错误',
+        message: `Internal error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: error instanceof Error ? error.message : 'Unknown error',
         details: errorDetails,
       },
     };
@@ -734,24 +734,24 @@ export async function callPromptAgentWithPayment(
 }
 
 /**
- * 调用 Prompt Agent 生成 prompt（直接传递 X-PAYMENT）
- * 用于已经准备好支付的情况
+ * Call Prompt Agent to generate prompt (directly pass X-PAYMENT)
+ * For cases where payment is already prepared
  * 
- * 注意：Prompt Agent 现在是 HTTP 格式（非 JSON-RPC）
+ * Note: Prompt Agent is now HTTP format (not JSON-RPC)
  */
 export async function callPromptAgent(
   promptAgentUrl: string,
   topic: string,
   style?: string,
   additionalRequirements?: string,
-  xPayment?: string // X-PAYMENT 请求头（用于支付验证）
+  xPayment?: string // X-PAYMENT request header (for payment validation)
 ): Promise<{ success: boolean; prompt?: string; error?: any }> {
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    // 如果提供了 X-PAYMENT，添加到请求头
+    // If X-PAYMENT is provided, add to request headers
     if (xPayment) {
       headers['X-PAYMENT'] = xPayment;
     }
@@ -766,7 +766,7 @@ export async function callPromptAgent(
       }),
     });
 
-    // 检查响应状态和 Content-Type
+    // Check response status and Content-Type
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
     
@@ -775,28 +775,28 @@ export async function callPromptAgent(
       if (isJson) {
         result = await response.json();
       } else {
-        // 如果不是 JSON，先读取文本（可能是 HTML 错误页面）
+        // If not JSON, read text first (may be HTML error page)
         const text = await response.text();
-        console.error('Prompt Agent 返回了非 JSON 响应:');
-        console.error('响应文本（前 500 字符）:', text.substring(0, 500));
+        console.error('Prompt Agent returned non-JSON response:');
+        console.error('Response text (first 500 chars):', text.substring(0, 500));
         
-        // 尝试解析为 JSON（可能 Content-Type 设置错误）
+        // Try to parse as JSON (Content-Type may be set incorrectly)
         try {
           result = JSON.parse(text);
         } catch (parseError) {
-          // 确实是 HTML 或其他非 JSON 格式
-          throw new Error(`Prompt Agent 返回了非 JSON 响应（状态码: ${response.status}，Content-Type: ${contentType}）。可能是端点不存在或返回了错误页面。响应内容: ${text.substring(0, 200)}`);
+          // Indeed HTML or other non-JSON format
+          throw new Error(`Prompt Agent returned non-JSON response (status code: ${response.status}, Content-Type: ${contentType}). Endpoint may not exist or returned error page. Response content: ${text.substring(0, 200)}`);
         }
       }
     } catch (parseError) {
-      console.error('解析 Prompt Agent 响应失败:', parseError);
-      throw parseError instanceof Error ? parseError : new Error(`解析响应失败: ${String(parseError)}`);
+      console.error('Failed to parse Prompt Agent response:', parseError);
+      throw parseError instanceof Error ? parseError : new Error(`Failed to parse response: ${String(parseError)}`);
     }
 
     if (!response.ok || !result.success) {
       return {
         success: false,
-        error: result.error || '调用 Prompt Agent 失败',
+        error: result.error || 'Failed to call Prompt Agent',
       };
     }
 
@@ -805,13 +805,13 @@ export async function callPromptAgent(
       prompt: result.prompt,
     };
   } catch (error) {
-    console.error('调用 Prompt Agent 时发生错误:', error);
+    console.error('Error occurred when calling Prompt Agent:', error);
     return {
       success: false,
       error: {
         code: -32603,
         message: 'Internal error',
-        data: error instanceof Error ? error.message : '未知错误',
+        data: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }

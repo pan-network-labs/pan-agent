@@ -55,7 +55,9 @@
     "insufficientAmount": "Insufficient transaction amount",
     "transactionFailed": "Transaction failed",
     "transactionNotConfirmed": "Transaction not confirmed",
-    "transactionNotFound": "Transaction not found"
+    "transactionNotFound": "Transaction not found",
+    "view402Response": "View 402 Response Data Format",
+    "view402ResponseDesc": "This is the complete 402 response data received from the server (x402 standard format):"
   },
   "errors": {
     "unknown": "Unknown error",
@@ -63,6 +65,37 @@
     "userRejected": "User rejected the request",
     "insufficientFunds": "Insufficient funds",
     "transactionRejected": "User rejected the transaction request"
+  },
+  "agents": {
+    "title": "A2A Agents Visualization",
+    "description": "Display all Agent information that complies with Google A2A protocol",
+    "imageGeneration": "Image Generation",
+    "loading": "Loading...",
+    "noData": "No data",
+    "basicInfo": "Basic Information",
+    "description": "Description",
+    "version": "Version",
+    "type": "Type",
+    "endpoints": "Endpoints",
+    "capabilities": "Capabilities",
+    "inputParams": "Input Parameters",
+    "outputParams": "Output Parameters",
+    "paymentInfo": "Payment Information",
+    "required": "Required",
+    "yes": "Yes",
+    "no": "No",
+    "defaultPrice": "Default Price",
+    "minAmount": "Minimum Amount",
+    "network": "Network",
+    "address": "Address",
+    "pricingModel": "Pricing Model",
+    "perCall": "Per Call",
+    "free": "Free",
+    "metadata": "Metadata",
+    "aboutA2A": "About A2A Protocol",
+    "aboutA2ADesc1": "A2A (Agent-to-Agent) is an open protocol developed by Google for achieving interoperability and collaboration between different AI agents.",
+    "aboutA2ADesc2": "All Agents comply with JSON-RPC 2.0 message format and can communicate and collaborate through standardized interfaces.",
+    "learnMore": "Learn more:"
   }
 }
 

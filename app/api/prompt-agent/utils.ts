@@ -1,8 +1,8 @@
 /**
- * Prompt Agent 共享工具函数
+ * Prompt Agent Shared Utility Functions
  */
 
-// CORS响应头配置
+// CORS response headers configuration
 export function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -12,70 +12,70 @@ export function getCorsHeaders() {
   };
 }
 
-// 生成 Prompt 的核心函数
+// Core function to generate Prompt
 export async function generatePrompt(
   topic: string,
   style?: string,
   additionalRequirements?: string
 ): Promise<{ success: boolean; prompt?: string; error?: string }> {
   try {
-    // 这里可以使用 AI 模型来生成 prompt
-    // 为了演示，我们使用简单的模板生成
-    // 实际项目中可以调用 GPT、Claude 等模型
+    // Here you can use AI models to generate prompt
+    // For demonstration, we use simple template generation
+    // In actual projects, you can call GPT, Claude and other models
     
-    let prompt = `一幅${style || '抽象'}风格的画作，主题是：${topic}`;
+    let prompt = `A ${style || 'abstract'} style artwork, theme: ${topic}`;
     
     if (additionalRequirements) {
-      prompt += `，${additionalRequirements}`;
+      prompt += `, ${additionalRequirements}`;
     }
     
-    // 可以添加更多 prompt 优化逻辑
-    // 例如：使用 AI 模型优化 prompt、添加艺术风格描述等
+    // Can add more prompt optimization logic
+    // For example: use AI models to optimize prompt, add art style descriptions, etc.
     
     return { success: true, prompt };
   } catch (error) {
-    console.error('生成 prompt 时发生错误:', error);
+    console.error('Error occurred while generating prompt:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : '未知错误',
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 
-// 获取代理卡片（Agent Card）
+// Get Agent Card
 export function getAgentCard(baseUrl: string) {
   return {
     "@context": "https://a2a.plus/context.jsonld",
     "@type": "Agent",
     "name": "Prompt Generation Agent",
-    "description": "一个用于生成图片生成提示词（prompt）的代理，可以根据主题、风格等要求生成优化的提示词",
+    "description": "An agent for generating image generation prompts, can generate optimized prompts based on topic, style and other requirements",
     "version": "1.0.0",
     "capabilities": [
       {
         "name": "generate_prompt",
-        "description": "根据主题、风格等要求生成图片生成的提示词",
+        "description": "Generate image generation prompts based on topic, style and other requirements",
         "pricing": {
-          "price": "0.001", // Prompt Agent 价格：0.001 BNB
+          "price": "0.001", // Prompt Agent price: 0.001 BNB
           "currency": "BNB",
           "network": "BSCTest",
-          // Prompt Agent 收款地址：使用智能合约地址（合约直接收款）
+          // Prompt Agent payment address: use smart contract address (contract directly receives payment)
           "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
-          "note": "调用此能力需要支付 0.001 BNB（支付到智能合约地址）"
+          "note": "Calling this capability requires payment of 0.001 BNB (pay to smart contract address)"
         },
         "inputSchema": {
           "type": "object",
           "properties": {
             "topic": {
               "type": "string",
-              "description": "图片主题或内容描述"
+              "description": "Image topic or content description"
             },
             "style": {
               "type": "string",
-              "description": "艺术风格（可选，如：抽象、写实、水彩等）"
+              "description": "Art style (optional, e.g.: abstract, realistic, watercolor, etc.)"
             },
             "additionalRequirements": {
               "type": "string",
-              "description": "额外的要求或描述（可选）"
+              "description": "Additional requirements or descriptions (optional)"
             }
           },
           "required": ["topic"]
@@ -85,11 +85,11 @@ export function getAgentCard(baseUrl: string) {
           "properties": {
             "prompt": {
               "type": "string",
-              "description": "生成的提示词"
+              "description": "Generated prompt"
             },
             "topic": {
               "type": "string",
-              "description": "原始主题"
+              "description": "Original topic"
             }
           }
         }
@@ -101,14 +101,14 @@ export function getAgentCard(baseUrl: string) {
     },
     "payment": {
       "required": true,
-      "defaultPrice": "0.001", // Prompt Agent 价格：0.001 BNB
+      "defaultPrice": "0.001", // Prompt Agent price: 0.001 BNB
       "currency": "BNB",
       "network": "BSCTest",
-      // Prompt Agent 收款地址：使用智能合约地址（合约直接收款）
+      // Prompt Agent payment address: use smart contract address (contract directly receives payment)
       "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
       "minAmount": "0.001",
       "pricingModel": "per_call",
-      "note": "调用此 Agent 需要支付，具体价格请查看 capabilities[].pricing 字段（支付到智能合约地址）"
+      "note": "Calling this Agent requires payment, see capabilities[].pricing field for specific prices (pay to smart contract address)"
     },
     "metadata": {
       "provider": "Custom",
