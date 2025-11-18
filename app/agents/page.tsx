@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getLocale, useTranslations, type Locale } from '../lib/i18n';
+import { getLocale, useTranslations, type Locale } from '../../lib/i18n';
 
 interface AgentCard {
   '@context'?: string;
