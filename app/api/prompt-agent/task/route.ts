@@ -46,14 +46,23 @@ export async function OPTIONS() {
 function generateRandomRarity(): SBTRarity {
   const random = Math.random() * 100; // Random number between 0-100
   
+  console.log('🎲 Random number generated:', random.toFixed(4));
+  console.log('   Range check:');
+  console.log('   - S level: 0 to 0.25 (0.25%)');
+  console.log('   - R level: 0.25 to 5.25 (5%)');
+  console.log('   - N level: 5.25 to 100 (94.75%)');
+  
   if (random < 0.25) {
     // S level: 0-0.25 (0.25%)
+    console.log('   ✅ Result: S (Super Rare)');
     return 'S';
   } else if (random < 5.25) {
     // R level: 0.25-5.25 (5%)
+    console.log('   ✅ Result: R (Rare)');
     return 'R';
   } else {
     // N level: 5.25-100 (94.75%)
+    console.log('   ✅ Result: N (Normal)');
     return 'N';
   }
 }
