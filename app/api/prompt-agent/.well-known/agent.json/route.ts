@@ -1,17 +1,17 @@
 /**
- * Prompt Agent Card 标准端点
+ * Prompt Agent Card Standard Endpoint
  * GET /api/prompt-agent/.well-known/agent.json
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCorsHeaders, getAgentCard } from '../../utils';
 
-// 处理预检请求（OPTIONS）
+// Handle preflight requests (OPTIONS)
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
-// GET /api/prompt-agent/.well-known/agent.json - 返回代理卡片（标准路径）
+// GET /api/prompt-agent/.well-known/agent.json - Return agent card (standard path)
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('获取代理卡片时发生错误:', error);
+    console.error('Error occurred while getting agent card:', error);
     return NextResponse.json(
-      { error: '获取代理卡片失败' },
+      { error: 'Failed to get agent card' },
       { 
         status: 500,
         headers: getCorsHeaders()
