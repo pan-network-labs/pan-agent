@@ -392,55 +392,49 @@ export async function callPromptAgentWithPayment(
         };
       }
 
-      // 4. 向智能合约支付（使用从 x402 响应中获取的地址和 referrer）
-      const { makeContractPayment } = await import('../payment/simple');
+      // 4. 向智能合约支付（Agent 间支付，不发放 SBT）
+      // 重要：这是 Generate Agent 支付给 Prompt Agent，不是用户支付
+      // 所以不应该给用户发放 SBT，应该使用直接转账到合约地址
+      const { makeDirectPayment } = await import('../payment/simple');
       
-      // 将 Wei 转换为 BNB 格式（用于 makeContractPayment）
-      // 注意：makeContractPayment 接受 BNB 格式的字符串
+      // 将 Wei 转换为 BNB 格式（用于 makeDirectPayment）
       const { ethers } = await import('ethers');
       const amountBNB = ethers.formatEther(amountWei);
       
-      console.log('准备调用合约支付（传递给 makeContractPayment 的参数）:');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('💰 Generate Agent 支付给 Prompt Agent（Agent 间支付）');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('⚠️  这是 Agent 间支付，不发放 SBT');
       console.log('合约地址:', address);
       console.log('支付金额 (BNB):', amountBNB);
       console.log('支付金额 (Wei):', amountWei);
-      console.log('用户地址 (recipient):', userAddress);
-      console.log('Referrer (字符串):', referrer || '(空字符串)');
-      console.log('Description:', `支付给 Prompt Agent 的 generate_prompt 能力`);
+      console.log('═══════════════════════════════════════════════════════════');
       
-      console.log('调用 makeContractPayment...');
-      const paymentResult = await makeContractPayment(
-        amountBNB,
-        `支付给 Prompt Agent 的 generate_prompt 能力`,
-        userAddress, // 用户地址（用于给用户发放 SBT）
-        address, // 使用从 x402 响应中获取的合约地址
-        referrer || '', // 推广人（字符串格式，如果没有则使用空字符串）
-        'N' // SBT 级别（默认为 N 级）
+      console.log('调用 makeDirectPayment（直接转账到合约地址，不发放 SBT）...');
+      const paymentResult = await makeDirectPayment(
+        address, // 直接转账到合约地址（合约的 receive() 函数会接收）
+        amountBNB
       );
       
-      console.log('合约支付结果:', paymentResult);
+      console.log('直接转账结果:', paymentResult);
 
       if (!paymentResult.success || !paymentResult.txHash) {
         console.error('═══════════════════════════════════════════════════════════');
-        console.error('❌ 合约支付失败:');
+        console.error('❌ 直接转账失败:');
         console.error('═══════════════════════════════════════════════════════════');
         console.error('错误信息:', paymentResult.error || '支付失败');
         console.error('完整结果:', JSON.stringify(paymentResult, null, 2));
-        if (paymentResult.errorDetails) {
-          console.error('错误详情:', JSON.stringify(paymentResult.errorDetails, null, 2));
-        }
         console.error('═══════════════════════════════════════════════════════════');
         
         return {
           success: false,
           error: {
-            message: paymentResult.error || '合约支付失败',
+            message: paymentResult.error || '直接转账失败',
             data: paymentResult,
-            type: 'Contract Payment Error',
+            type: 'Direct Payment Error',
             details: {
               error: paymentResult.error,
               txHash: paymentResult.txHash || null,
-              ...(paymentResult.errorDetails || {}), // 包含 errorDetails（授权地址信息）
             },
           },
         };
