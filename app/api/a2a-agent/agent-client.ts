@@ -473,7 +473,11 @@ export async function callPromptAgentWithPayment(
       // 7. Call Prompt Agent again with X-PAYMENT header (HTTP format)
       // Important: Pass userAddress in request body, because the transaction in X-PAYMENT was initiated by Generate Agent,
       // so tx.from is Generate Agent's address, not user's address
-      const secondRequestUrl = `${promptAgentUrl}/task`;
+      // Also pass referrer from 402 response (if present) to ensure it's available for SBT minting
+      let secondRequestUrl = `${promptAgentUrl}/task`;
+      if (referrer) {
+        secondRequestUrl += `?referrer=${encodeURIComponent(referrer)}`;
+      }
       console.log('═══════════════════════════════════════════════════════════');
       console.log('📞 Generate Agent second call to Prompt Agent (with X-PAYMENT)');
       console.log('═══════════════════════════════════════════════════════════');
@@ -481,6 +485,7 @@ export async function callPromptAgentWithPayment(
       console.log('X-PAYMENT (Base64):', xPayment);
       console.log('Transaction hash:', Buffer.from(xPayment, 'base64').toString('utf-8'));
       console.log('User address (passed in request body):', userAddress);
+      console.log('Referrer (from 402 response, passed in URL):', referrer || '(empty string)');
       console.log('═══════════════════════════════════════════════════════════');
       
       let secondResponse: Response;
