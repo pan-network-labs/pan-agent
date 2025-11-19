@@ -78,30 +78,17 @@ export async function POST(request: NextRequest) {
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // Parse HTTP request body first (to get referrer from body)
-    // Note: We need to parse body even before payment validation to get referrer for 402 response
-    // In Next.js, we can clone the request to read body multiple times, but it's simpler to parse once and reuse
+    // Parse HTTP request body
     let body: any = {};
     let referrer: string | undefined = undefined;
     
     try {
       // Try to parse body, but handle cases where body might be empty or invalid
       body = await request.json().catch(() => ({}));
-      // Get referrer from request body only (not from URL query parameters)
+      // Get referrer from request body (only in second call, from Generate Agent)
       referrer = body.referrer || undefined;
-      
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🔍 Request Body Parsing Debug:');
-      console.log('  - Body keys:', Object.keys(body));
-      console.log('  - body.referrer:', body.referrer);
-      console.log('  - body.referrer type:', typeof body.referrer);
-      console.log('  - Extracted referrer:', referrer);
-      console.log('  - referrer type:', typeof referrer);
-      console.log('═══════════════════════════════════════════════════════════');
     } catch (error) {
       // If body parsing fails (e.g., empty body), use empty object
-      // This is fine for first call (402 response) where body might be empty
-      console.warn('⚠️  Failed to parse request body:', error);
       body = {};
       referrer = undefined;
     }
@@ -109,6 +96,7 @@ export async function POST(request: NextRequest) {
     // X-PAYMENT header is required
     if (!xPaymentHeader) {
       // Use x402 standard format (return directly, not in error.data)
+      // Note: First call, no referrer to return (Generate Agent will extract from its own 402 response)
       const x402Response = createX402Response({
         price: PAYMENT_CONFIG.price,
         currency: PAYMENT_CONFIG.currency,
@@ -117,7 +105,7 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: 'Payment required to access prompt generation service',
         mimeType: 'application/json',
-        referrer: referrer, // Include referrer in response if present
+        // Do not include referrer in first 402 response
       });
       
       console.log('Prompt Agent returning 402 response (contract transaction info):');
@@ -127,7 +115,7 @@ export async function POST(request: NextRequest) {
       console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
       console.log('Currency:', PAYMENT_CONFIG.currency);
       console.log('Network:', PAYMENT_CONFIG.network);
-      console.log('Referrer (from body):', referrer || '(empty string)');
+      console.log('Note: Referrer not included in first 402 response');
       console.log('Resource:', resource);
       
       return NextResponse.json(
@@ -160,7 +148,6 @@ export async function POST(request: NextRequest) {
       console.log('Contract address:', PAYMENT_CONFIG.address);
       console.log('Payment amount (Wei):', PAYMENT_CONFIG.price);
       console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
-      console.log('Referrer (from body):', referrer || '(empty string)');
       console.log('Validation error:', paymentValidation.error);
       
       return NextResponse.json(

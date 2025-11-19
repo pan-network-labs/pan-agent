@@ -387,10 +387,12 @@ export async function POST(request: NextRequest) {
       const defaultTopic = 'A beautiful abstract artwork';
       
       // Call Prompt Agent (automatically handles payment flow, pass user address for SBT issuance)
-      // Get referrer from request URL, pass to Prompt Agent
-      const referrer = requestUrl.searchParams.get('referrer') || '';
+      // Pass referrer from Generate Agent's own 402 response (user payment referrer)
+      // This referrer will be passed to Prompt Agent in second call, and then to contract mintNSBT/mintRSBT/mintSSBT
       
-      console.log('Generate Agent calling Prompt Agent, referrer passed:', referrer || '(empty string)');
+      console.log('Generate Agent calling Prompt Agent');
+      console.log('Referrer from Generate Agent 402 response (user payment):', referrer || '(empty string)');
+      console.log('Note: This referrer will be passed to Prompt Agent, then to contract mintNSBT/mintRSBT/mintSSBT');
       
       const promptResult = await callPromptAgentWithPayment(
         agentUrl,
@@ -398,7 +400,7 @@ export async function POST(request: NextRequest) {
         'abstract',
         'rich in color, full of creativity',
         userAddress, // Pass user address for SBT issuance to user
-        referrer || undefined // Pass referrer to Prompt Agent (Prompt Agent will include it in 402 response)
+        referrer || undefined // Pass referrer from Generate Agent's 402 response (user payment referrer)
       );
 
       if (!promptResult.success || !promptResult.prompt) {

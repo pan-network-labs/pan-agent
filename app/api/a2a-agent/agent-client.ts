@@ -212,20 +212,20 @@ export async function callPromptAgentWithPayment(
   style?: string,
   additionalRequirements?: string,
   userAddress?: string, // User address (for SBT issuance to user)
-  referrer?: string // Optional: Referrer (obtained from Generate Agent's request URL)
+  referrer?: string // Optional: Referrer (extracted from Prompt Agent's 402 response)
 ): Promise<{ success: boolean; prompt?: string; rarity?: string; error?: any }> {
   try {
     // 1. Call Prompt Agent first (without X-PAYMENT, HTTP format)
-    // Pass referrer in request body (not in URL query parameters)
+    // Do not pass referrer in first call
     const requestUrl = `${promptAgentUrl}/task`;
     
     console.log('═══════════════════════════════════════════════════════════');
-    console.log('📞 Generate Agent calling Prompt Agent');
+    console.log('📞 Generate Agent calling Prompt Agent (first call)');
     console.log('═══════════════════════════════════════════════════════════');
     console.log('Prompt Agent URL:', promptAgentUrl);
     console.log('Full request URL:', requestUrl);
-    console.log('Referrer (passed in body):', referrer || '(empty string)');
     console.log('Request parameters:', { topic, style, additionalRequirements });
+    console.log('Note: Referrer not passed in first call, will be extracted from 402 response');
     console.log('═══════════════════════════════════════════════════════════');
     
     let response: Response;
@@ -240,7 +240,7 @@ export async function callPromptAgentWithPayment(
           topic,
           style,
           additionalRequirements,
-          referrer: referrer || '', // Pass referrer in body (keep empty string instead of undefined to ensure field exists)
+          // Do not pass referrer in first call
         }),
       });
     } catch (fetchError) {
@@ -355,8 +355,6 @@ export async function callPromptAgentWithPayment(
       const requirement = x402Data.accepts[0];
       const address = requirement.address || '';
       const amountWei = requirement.maxAmountRequired || '';
-      // Parse referrer (from ext.referrer field)
-      const referrer = requirement.ext?.referrer || '';
 
       console.log('Contract transaction information parsed from 402 response:');
       console.log('Full requirement:', JSON.stringify(requirement, null, 2));
@@ -365,16 +363,20 @@ export async function callPromptAgentWithPayment(
       console.log('Payment amount (BNB):', amountWei ? (BigInt(amountWei) / BigInt(1e18)).toString() : 'N/A');
       console.log('Currency:', requirement.currency || 'N/A');
       console.log('Network:', requirement.network || 'N/A');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🔍 Referrer Extraction from 402 Response:');
-      console.log('  - requirement.ext:', requirement.ext);
-      console.log('  - requirement.ext?.referrer:', requirement.ext?.referrer);
-      console.log('  - Extracted referrer:', referrer);
-      console.log('  - referrer type:', typeof referrer);
-      console.log('  - referrer is empty string:', referrer === '');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('Resource:', requirement.resource || 'N/A');
       console.log('Description:', requirement.description || 'N/A');
+      
+      // Use referrer from Generate Agent's 402 response (user payment referrer)
+      // This referrer was passed as parameter to callPromptAgentWithPayment
+      // It will be passed to Prompt Agent in second call, and then to contract mintNSBT/mintRSBT/mintSSBT
+      const finalReferrer = referrer || '';
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 Referrer Information:');
+      console.log('  - Referrer from Generate Agent 402 response (parameter):', referrer || '(empty string)');
+      console.log('  - Final referrer to pass to Prompt Agent:', finalReferrer || '(empty string)');
+      console.log('  - Note: This referrer will be passed to contract mintNSBT/mintRSBT/mintSSBT');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       if (!address || !amountWei) {
         return {
@@ -487,7 +489,7 @@ export async function callPromptAgentWithPayment(
       console.log('X-PAYMENT (Base64):', xPayment);
       console.log('Transaction hash:', Buffer.from(xPayment, 'base64').toString('utf-8'));
       console.log('User address (passed in request body):', userAddress);
-      console.log('Referrer (from 402 response, passed in body):', referrer || '(empty string)');
+      console.log('Referrer (from 402 response, passed in body):', finalReferrer || '(empty string)');
       console.log('═══════════════════════════════════════════════════════════');
       
       let secondResponse: Response;
@@ -503,7 +505,7 @@ export async function callPromptAgentWithPayment(
             style,
             additionalRequirements,
             userAddress, // Important: Pass user address, because the transaction in X-PAYMENT was initiated by Generate Agent
-            referrer: referrer || '', // Pass referrer from 402 response (keep empty string instead of undefined to ensure field exists in body)
+            referrer: finalReferrer || '', // Pass referrer from 402 response (keep empty string instead of undefined to ensure field exists in body)
           }),
         });
       } catch (fetchError) {
