@@ -259,20 +259,20 @@ export default function Home() {
       const urlParams = new URLSearchParams(window.location.search);
       const referrer = urlParams.get('referrer') || '';
       
-      // Build request URL, add referrer to query parameters if it exists
-      let requestUrl = '/api/generate-agent/task';
-      if (referrer) {
-        requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
-      }
+      // Pass referrer in request body (not in URL query parameters)
+      const requestUrl = '/api/generate-agent/task';
       
-      console.log('Request URL (with referrer):', requestUrl);
+      console.log('Request URL:', requestUrl);
+      console.log('Referrer (passed in body):', referrer || '(empty string)');
       
       const response = await fetch(requestUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          referrer: referrer || '', // Pass referrer in body
+        }),
       });
 
       // Check if it's 402 status code (payment required)
@@ -307,16 +307,13 @@ export default function Home() {
             }
           }
           
-          // Parse referrer (from ext.referrer field)
-          // Prioritize referrer from 402 response, if not then use referrer from URL
-          const referrerFromResponse = requirement.ext?.referrer || '';
-          const referrerFromUrl = urlParams.get('referrer') || '';
-          const referrer = referrerFromResponse || referrerFromUrl || '';
+          // Parse referrer (from ext.referrer field in 402 response)
+          // Referrer should come from 402 response, not from URL
+          const referrer = requirement.ext?.referrer || '';
           
-          console.log('Referrer information:', {
-            fromResponse: referrerFromResponse,
-            fromUrl: referrerFromUrl,
-            final: referrer,
+          console.log('Referrer information (from 402 response):', {
+            fromResponse: requirement.ext?.referrer || '(empty string)',
+            final: referrer || '(empty string)',
           });
           
           if (address) {
@@ -679,17 +676,14 @@ export default function Home() {
     setSbtRarity(null); // Reset SBT level
 
     try {
-      // Get referrer from URL, ensure it's included in request
-      const urlParams = new URLSearchParams(window.location.search);
-      const referrer = urlParams.get('referrer') || '';
+      // Get referrer from 402 response (stored in paymentInfo)
+      // Referrer should come from 402 response, not from URL
+      const referrer = paymentInfo?.referrer || '';
       
-      // Build request URL, add referrer to query parameters if it exists
-      let requestUrl = '/api/generate-agent/task';
-      if (referrer) {
-        requestUrl += `?referrer=${encodeURIComponent(referrer)}`;
-      }
+      const requestUrl = '/api/generate-agent/task';
       
-      console.log('handleGenerateWithPayment request URL (with referrer):', requestUrl);
+      console.log('handleGenerateWithPayment request URL:', requestUrl);
+      console.log('Referrer (from 402 response, passed in body):', referrer || '(empty string)');
       
       const response = await fetch(requestUrl, {
         method: 'POST',
@@ -697,7 +691,9 @@ export default function Home() {
           'Content-Type': 'application/json',
           'X-PAYMENT': xPayment,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          referrer: referrer || '', // Pass referrer from 402 response in body
+        }),
       });
 
       // If still returns 402, payment verification failed

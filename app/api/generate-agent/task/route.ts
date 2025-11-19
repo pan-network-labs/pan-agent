@@ -268,8 +268,26 @@ export async function POST(request: NextRequest) {
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // Get referrer from query parameters (referrer address)
-    const referrer = requestUrl.searchParams.get('referrer') || undefined;
+    // Parse HTTP request body to get referrer (not from URL query parameters)
+    let body: any = {};
+    let referrer: string | undefined = undefined;
+    
+    try {
+      body = await request.json().catch(() => ({}));
+      // Get referrer from request body (from client or from previous 402 response)
+      referrer = body.referrer !== undefined ? body.referrer : undefined;
+      
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 Generate Agent Request Body Parsing:');
+      console.log('  - Body keys:', Object.keys(body));
+      console.log('  - body.referrer:', body.referrer);
+      console.log('  - Extracted referrer:', referrer);
+      console.log('═══════════════════════════════════════════════════════════');
+    } catch (error) {
+      console.warn('⚠️  Failed to parse request body:', error);
+      body = {};
+      referrer = undefined;
+    }
 
     // If X-PAYMENT has no information, directly return 402 and payment information (x402 standard format)
     if (!xPaymentHeader) {
@@ -281,7 +299,7 @@ export async function POST(request: NextRequest) {
         resource: resource,
         description: 'Payment required to generate image',
         mimeType: 'application/json',
-        referrer: referrer, // Include referrer in response if present
+        referrer: referrer, // Include referrer from request body in 402 response
       });
       
       console.log('Generate Agent returning 402 response (contract transaction info):');
@@ -291,7 +309,7 @@ export async function POST(request: NextRequest) {
       console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
       console.log('Currency:', PAYMENT_CONFIG.currency);
       console.log('Network:', PAYMENT_CONFIG.network);
-      console.log('Referrer:', referrer || '(empty string)');
+      console.log('Referrer (from request body, included in ext.referrer):', referrer || '(empty string)');
       console.log('Resource:', resource);
       
       return NextResponse.json(
@@ -387,12 +405,12 @@ export async function POST(request: NextRequest) {
       const defaultTopic = 'A beautiful abstract artwork';
       
       // Call Prompt Agent (automatically handles payment flow, pass user address for SBT issuance)
-      // Pass referrer from Generate Agent's own 402 response (user payment referrer)
-      // This referrer will be passed to Prompt Agent in second call, and then to contract mintNSBT/mintRSBT/mintSSBT
+      // Pass referrer from request body (from client's 402 response)
+      // This referrer will be passed to Prompt Agent via 402 response, and then to contract mintNSBT/mintRSBT/mintSSBT
       
       console.log('Generate Agent calling Prompt Agent');
-      console.log('Referrer from Generate Agent 402 response (user payment):', referrer || '(empty string)');
-      console.log('Note: This referrer will be passed to Prompt Agent, then to contract mintNSBT/mintRSBT/mintSSBT');
+      console.log('Referrer from request body (from client 402 response):', referrer || '(empty string)');
+      console.log('Note: This referrer will be passed to Prompt Agent via 402 response, then to contract mintNSBT/mintRSBT/mintSSBT');
       
       const promptResult = await callPromptAgentWithPayment(
         agentUrl,
@@ -400,7 +418,7 @@ export async function POST(request: NextRequest) {
         'abstract',
         'rich in color, full of creativity',
         userAddress, // Pass user address for SBT issuance to user
-        referrer || undefined // Pass referrer from Generate Agent's 402 response (user payment referrer)
+        referrer || undefined // Pass referrer from request body (from client's 402 response)
       );
 
       if (!promptResult.success || !promptResult.prompt) {
