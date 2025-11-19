@@ -78,8 +78,33 @@ export async function POST(request: NextRequest) {
     const requestUrl = new URL(request.url);
     const resource = requestUrl.toString();
     
-    // Get referrer from query parameters (referrer address)
-    const referrer = requestUrl.searchParams.get('referrer') || undefined;
+    // Parse HTTP request body first (to get referrer from body)
+    // Note: We need to parse body even before payment validation to get referrer for 402 response
+    // In Next.js, we can clone the request to read body multiple times, but it's simpler to parse once and reuse
+    let body: any = {};
+    let referrer: string | undefined = undefined;
+    
+    try {
+      // Try to parse body, but handle cases where body might be empty or invalid
+      body = await request.json().catch(() => ({}));
+      // Get referrer from request body only (not from URL query parameters)
+      referrer = body.referrer || undefined;
+      
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 Request Body Parsing Debug:');
+      console.log('  - Body keys:', Object.keys(body));
+      console.log('  - body.referrer:', body.referrer);
+      console.log('  - body.referrer type:', typeof body.referrer);
+      console.log('  - Extracted referrer:', referrer);
+      console.log('  - referrer type:', typeof referrer);
+      console.log('═══════════════════════════════════════════════════════════');
+    } catch (error) {
+      // If body parsing fails (e.g., empty body), use empty object
+      // This is fine for first call (402 response) where body might be empty
+      console.warn('⚠️  Failed to parse request body:', error);
+      body = {};
+      referrer = undefined;
+    }
     
     // X-PAYMENT header is required
     if (!xPaymentHeader) {
@@ -102,7 +127,7 @@ export async function POST(request: NextRequest) {
       console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
       console.log('Currency:', PAYMENT_CONFIG.currency);
       console.log('Network:', PAYMENT_CONFIG.network);
-      console.log('Referrer:', referrer || '(empty string)');
+      console.log('Referrer (from body):', referrer || '(empty string)');
       console.log('Resource:', resource);
       
       return NextResponse.json(
@@ -135,7 +160,7 @@ export async function POST(request: NextRequest) {
       console.log('Contract address:', PAYMENT_CONFIG.address);
       console.log('Payment amount (Wei):', PAYMENT_CONFIG.price);
       console.log('Payment amount (BNB):', (BigInt(PAYMENT_CONFIG.price) / BigInt(1e18)).toString());
-      console.log('Referrer:', referrer || '(empty string)');
+      console.log('Referrer (from body):', referrer || '(empty string)');
       console.log('Validation error:', paymentValidation.error);
       
       return NextResponse.json(
@@ -146,9 +171,6 @@ export async function POST(request: NextRequest) {
         }
       );
     }
-
-    // 2. Parse HTTP request body
-    const body = await request.json();
 
     // 3. Get user address (recipient, for SBT issuance)
     // Priority:
@@ -236,16 +258,27 @@ export async function POST(request: NextRequest) {
     console.log('SBT level:', rarity);
     console.log('Payment amount (BNB):', amountBNB);
     console.log('Contract address:', PAYMENT_CONFIG.address);
-    console.log('Referrer:', referrer || '(empty string)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 Referrer Debug Information:');
+    console.log('  - referrer variable value:', referrer);
+    console.log('  - referrer type:', typeof referrer);
+    console.log('  - referrer is undefined:', referrer === undefined);
+    console.log('  - referrer is empty string:', referrer === '');
+    console.log('  - referrer || "":', referrer || '');
+    console.log('  - Final referrer passed to contract:', referrer || '');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('═══════════════════════════════════════════════════════════');
 
     // makeContractPayment will automatically read PROMPT_PRIVATE_KEY (priority) or PAYMENT_PRIVATE_KEY from environment variables
+    const finalReferrer = referrer || ''; // Ensure referrer is always a string (empty string if undefined)
+    console.log('📤 Calling makeContractPayment with referrer:', finalReferrer);
+    
     const sbtResult = await makeContractPayment(
       amountBNB,
       `Prompt Agent Service Fee`,
       userAddress, // User address (receives SBT)
       PAYMENT_CONFIG.address, // Contract address
-      referrer || '', // Referrer
+      finalReferrer, // Referrer (always string, empty string if not provided)
       rarity // SBT level
     );
 
