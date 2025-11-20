@@ -39,29 +39,29 @@ export async function OPTIONS() {
 
 /**
  * Randomly generate SBT rarity level
- * N level: 94.75%
- * R level: 5%
- * S level: 0.25%
+ * N level: 89%
+ * R level: 10%
+ * S level: 1%
  */
 function generateRandomRarity(): SBTRarity {
   const random = Math.random() * 100; // Random number between 0-100
   
   console.log('🎲 Random number generated:', random.toFixed(4));
   console.log('   Range check:');
-  console.log('   - S level: 0 to 0.25 (0.25%)');
-  console.log('   - R level: 0.25 to 5.25 (5%)');
-  console.log('   - N level: 5.25 to 100 (94.75%)');
+  console.log('   - S level: 0 to 1 (1%)');
+  console.log('   - R level: 1 to 11 (10%)');
+  console.log('   - N level: 11 to 100 (89%)');
   
-  if (random < 0.25) {
-    // S level: 0-0.25 (0.25%)
+  if (random < 1) {
+    // S level: 0-1 (1%)
     console.log('   ✅ Result: S (Super Rare)');
     return 'S';
-  } else if (random < 5.25) {
-    // R level: 0.25-5.25 (5%)
+  } else if (random < 11) {
+    // R level: 1-11 (10%)
     console.log('   ✅ Result: R (Rare)');
     return 'R';
   } else {
-    // N level: 5.25-100 (94.75%)
+    // N level: 11-100 (89%)
     console.log('   ✅ Result: N (Normal)');
     return 'N';
   }
@@ -209,13 +209,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Randomly generate SBT rarity level (N: 94.75%, R: 5%, S: 0.25%)
+    // 4. Randomly generate SBT rarity level (N: 89%, R: 10%, S: 1%)
     const rarity = generateRandomRarity();
     console.log('═══════════════════════════════════════════════════════════');
     console.log('🎲 Randomly generating SBT rarity level');
     console.log('═══════════════════════════════════════════════════════════');
     console.log('Generated level:', rarity, `(${rarity === 'N' ? 'N (Normal)' : rarity === 'R' ? 'R (Rare)' : 'S (Super Rare)'})`);
-    console.log('Probability distribution: N 94.75%, R 5%, S 0.25%');
+    console.log('Probability distribution: N 89%, R 10%, S 1%');
     console.log('═══════════════════════════════════════════════════════════');
 
     // 5. Use PROMPT_PRIVATE_KEY to call contract and mint SBT of corresponding level
