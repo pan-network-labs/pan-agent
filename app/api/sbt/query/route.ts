@@ -400,12 +400,30 @@ async function getSBTsList(request: NextRequest, address: string) {
       const paymentInfos = result.paymentInfos || result[1] || [];
       
       // Convert data format
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 [QUERY] Processing SBT list for address:', address);
+      console.log('  - Token count:', tokenIds.length);
+      console.log('  - PaymentInfo count:', paymentInfos.length);
+      console.log('═══════════════════════════════════════════════════════════');
+      
       const formattedList = tokenIds.map((tokenId: bigint, index: number) => {
         const info = paymentInfos[index] || {};
         const amount = info.amount || BigInt(0);
         const timestamp = info.timestamp || BigInt(0);
         const timestampNum = Number(timestamp);
         const timestampDate = timestampNum > 0 ? new Date(timestampNum * 1000).toISOString() : null;
+        
+        // Extract referrer from paymentInfo (contract returns referrer field)
+        const referrer = info.referrer || '';
+        
+        if (index === 0) {
+          console.log('📋 [QUERY] Sample paymentInfo (first item):');
+          console.log('  - info type:', typeof info);
+          console.log('  - info keys:', Object.keys(info || {}));
+          console.log('  - info.referrer:', info?.referrer);
+          console.log('  - info.referrer type:', typeof info?.referrer);
+          console.log('  - Extracted referrer:', referrer || '(empty string)');
+        }
         
         return {
           tokenId: tokenId.toString(),
@@ -417,8 +435,15 @@ async function getSBTsList(request: NextRequest, address: string) {
           payer: info.payer || '',
           recipient: info.recipient || '',
           rarity: info.rarity !== undefined ? Number(info.rarity) : null,
+          referrer: referrer, // Add referrer field from contract
         };
       });
+      
+      console.log('✅ [QUERY] Formatted list with referrer fields');
+      console.log('  - Total items:', formattedList.length);
+      console.log('  - Items with referrer:', formattedList.filter((item: any) => item.referrer && item.referrer !== '').length);
+      console.log('  - Items without referrer:', formattedList.filter((item: any) => !item.referrer || item.referrer === '').length);
+      console.log('═══════════════════════════════════════════════════════════');
 
       return jsonResponse({
         success: true,
@@ -474,12 +499,32 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
     const contract = new ethers.Contract(config.contractAddress, PAYMENT_SBT_ABI as any, provider);
 
     try {
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 [QUERY] Querying payment info for tokenId:', tokenId);
+      console.log('═══════════════════════════════════════════════════════════');
+      
       const paymentInfo = await contract.getPaymentInfo(tokenId);
+      
+      console.log('📋 [QUERY] Raw paymentInfo from contract:');
+      console.log('  - paymentInfo type:', typeof paymentInfo);
+      console.log('  - paymentInfo keys:', Object.keys(paymentInfo || {}));
+      console.log('  - paymentInfo.referrer:', paymentInfo?.referrer);
+      console.log('  - paymentInfo.referrer type:', typeof paymentInfo?.referrer);
+      console.log('  - paymentInfo.referrer === undefined:', paymentInfo?.referrer === undefined);
+      console.log('  - paymentInfo.referrer === null:', paymentInfo?.referrer === null);
+      console.log('  - paymentInfo.referrer === "":', paymentInfo?.referrer === '');
+      console.log('═══════════════════════════════════════════════════════════');
       
       const amount = paymentInfo.amount || BigInt(0);
       const timestamp = paymentInfo.timestamp || BigInt(0);
       const timestampNum = Number(timestamp);
       const timestampDate = timestampNum > 0 ? new Date(timestampNum * 1000).toISOString() : null;
+      
+      // Extract referrer from paymentInfo (contract returns referrer field)
+      const referrer = paymentInfo.referrer || '';
+      
+      console.log('✅ [QUERY] Extracted referrer from contract:', referrer || '(empty string)');
+      console.log('═══════════════════════════════════════════════════════════');
       
       return jsonResponse({
         success: true,
@@ -493,6 +538,7 @@ async function getPaymentDetail(request: NextRequest, tokenId: string) {
           timestampDate,
           payer: paymentInfo.payer || '',
           rarity: paymentInfo.rarity !== undefined ? Number(paymentInfo.rarity) : null,
+          referrer: referrer, // Add referrer field from contract
           contractAddress: config.contractAddress,
         },
       });

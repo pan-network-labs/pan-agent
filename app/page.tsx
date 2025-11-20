@@ -352,7 +352,7 @@ export default function Home() {
           } else {
             setError(`Payment of ${priceBNB} ${data.currency || 'BNB'} required, but payment address not found.`);
             setLoading(false);
-            return;
+      return;
           }
         }
       }
@@ -650,9 +650,19 @@ export default function Home() {
       }
 
       console.log('Transaction confirmed:', receipt);
+      console.log('Transaction hash (original):', txHash);
+      console.log('Transaction hash type:', typeof txHash);
+      console.log('Transaction hash length:', txHash.length);
+      console.log('Transaction hash starts with 0x:', txHash.startsWith('0x'));
 
       // Encode transaction hash as Base64
       const xPayment = btoa(txHash);
+      console.log('Transaction hash (Base64 encoded):', xPayment);
+      
+      // Verify encoding/decoding
+      const decodedHash = atob(xPayment);
+      console.log('Transaction hash (Base64 decoded for verification):', decodedHash);
+      console.log('Encoding/decoding match:', txHash === decodedHash);
 
       // Close payment modal
       setShowPaymentModal(false);
@@ -682,8 +692,20 @@ export default function Home() {
       
       const requestUrl = '/api/generate-agent/task';
       
-      console.log('handleGenerateWithPayment request URL:', requestUrl);
-      console.log('Referrer (from 402 response, passed in body):', referrer || '(empty string)');
+      // Prepare request body
+      const requestBody = {
+        referrer: referrer || '', // Pass referrer from 402 response in body
+      };
+      
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 Client: handleGenerateWithPayment Request Details:');
+      console.log('  - Request URL:', requestUrl);
+      console.log('  - paymentInfo:', paymentInfo);
+      console.log('  - paymentInfo?.referrer:', paymentInfo?.referrer);
+      console.log('  - Referrer (from 402 response, passed in body):', referrer || '(empty string)');
+      console.log('  - Request body object:', requestBody);
+      console.log('  - Request body JSON stringified:', JSON.stringify(requestBody));
+      console.log('═══════════════════════════════════════════════════════════');
       
       const response = await fetch(requestUrl, {
         method: 'POST',
@@ -691,9 +713,7 @@ export default function Home() {
           'Content-Type': 'application/json',
           'X-PAYMENT': xPayment,
         },
-        body: JSON.stringify({
-          referrer: referrer || '', // Pass referrer from 402 response in body
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       // If still returns 402, payment verification failed
@@ -812,7 +832,7 @@ export default function Home() {
             <p className="text-center text-sm text-zinc-600 dark:text-zinc-400 mb-6">
               {t('home.description')}
             </p>
-            
+
             <button
               onClick={handleGenerate}
               disabled={loading}
@@ -995,7 +1015,7 @@ export default function Home() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                   {t('home.generatedImage')}
-                </h2>
+              </h2>
                 {sbtRarity && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-zinc-600 dark:text-zinc-400">{t('home.sbtLevel')}:</span>
@@ -1044,7 +1064,7 @@ export default function Home() {
             </div>
           )}
         </div>
-        </main>
+      </main>
       </div>
     </div>
   );

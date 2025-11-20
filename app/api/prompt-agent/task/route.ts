@@ -271,7 +271,21 @@ export async function POST(request: NextRequest) {
 
     // makeContractPayment will automatically read PROMPT_PRIVATE_KEY (priority) or PAYMENT_PRIVATE_KEY from environment variables
     const finalReferrer = referrer || ''; // Ensure referrer is always a string (empty string if undefined)
-    console.log('📤 Calling makeContractPayment with referrer:', finalReferrer);
+    
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📤 [PROMPT AGENT] Calling makeContractPayment to mint SBT');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('  - Referrer value:', finalReferrer || '(empty string)');
+    console.log('  - Referrer type:', typeof finalReferrer);
+    console.log('  - Referrer length:', finalReferrer.length);
+    console.log('  - Referrer === "":', finalReferrer === '');
+    console.log('  - User address (SBT recipient):', userAddress);
+    console.log('  - SBT rarity:', rarity);
+    console.log('  - Contract address:', PAYMENT_CONFIG.address);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('⚠️  [PROMPT AGENT] This referrer will be passed to contract mintNSBT/mintRSBT/mintSSBT');
+    console.log('   After minting, referrer will be stored in contract and can be queried via getPaymentInfo');
+    console.log('═══════════════════════════════════════════════════════════');
     
     const sbtResult = await makeContractPayment(
       amountBNB,

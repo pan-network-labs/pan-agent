@@ -161,6 +161,15 @@ export async function makeContractPayment(
     console.log('  - recipient (SBT receiver):', recipient);
     console.log('  - description:', description || '(empty string)');
     console.log('  - referrer:', referrerString || '(empty string)');
+    console.log('  - referrer type:', typeof referrerString);
+    console.log('  - referrer length:', referrerString.length);
+    console.log('  - referrer === "":', referrerString === '');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 [CONTRACT] Referrer will be stored in contract for this SBT');
+    console.log('   After minting, you can query referrer using:');
+    console.log('   - getPaymentInfo(tokenId) - should return referrer field');
+    console.log('   - getSBTsByAddress(address) - should return referrer in paymentInfos');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     // 4. Estimate gas and set sufficient gas limit
     let gasLimit: bigint;
@@ -340,6 +349,10 @@ export async function makeContractPayment(
       
       console.log('═══════════════════════════════════════════════════════════');
       console.log('✅ Contract call successful, SBT issued');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 [CONTRACT] Verifying referrer was stored in contract...');
+      console.log('  - Referrer passed to contract:', referrerString || '(empty string)');
+      console.log('  - Note: You can verify by calling getPaymentInfo(tokenId) after transaction confirms');
       console.log('═══════════════════════════════════════════════════════════');
     } catch (waitError: any) {
       console.error('═══════════════════════════════════════════════════════════');

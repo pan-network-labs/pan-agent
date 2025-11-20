@@ -103,9 +103,15 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     console.log('🔍 Generate Agent starting payment validation');
     console.log('═══════════════════════════════════════════════════════════');
     console.log('📋 Received X-PAYMENT header:', xPaymentHeader);
+    console.log('📋 X-PAYMENT header length:', xPaymentHeader.length);
+    console.log('📋 X-PAYMENT header type:', typeof xPaymentHeader);
     
     const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
     console.log('📝 Base64 decoded transaction hash:', tsHash);
+    console.log('📝 Decoded hash type:', typeof tsHash);
+    console.log('📝 Decoded hash length:', tsHash.length);
+    console.log('📝 Decoded hash starts with 0x:', tsHash.startsWith('0x'));
+    console.log('📝 Decoded hash format valid:', /^0x[a-fA-F0-9]{64}$/.test(tsHash));
     
     // 3. Connect to BSC Testnet
     console.log('🌐 Connecting to RPC node:', PAYMENT_CONFIG.rpcUrl);
@@ -113,10 +119,20 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     
     // 4. Query transaction information
     console.log('🔎 Querying transaction information...');
+    console.log('🔎 Querying with hash:', tsHash);
     const tx = await provider.getTransaction(tsHash);
     if (!tx) {
       console.error('❌ Transaction does not exist:', tsHash);
-      return { valid: false, error: 'Transaction does not exist' };
+      console.error('❌ Transaction hash format:', {
+        hash: tsHash,
+        type: typeof tsHash,
+        length: tsHash.length,
+        startsWith0x: tsHash.startsWith('0x'),
+        isValidFormat: /^0x[a-fA-F0-9]{64}$/.test(tsHash),
+      });
+      console.error('❌ RPC node URL:', PAYMENT_CONFIG.rpcUrl);
+      console.error('❌ Try querying this transaction hash on BSCScan to verify if it exists');
+      return { valid: false, error: `Transaction does not exist: ${tsHash}. Please verify the transaction hash on BSCScan.` };
     }
 
     // 5. Wait for transaction confirmation and get receipt
@@ -273,18 +289,46 @@ export async function POST(request: NextRequest) {
     let referrer: string | undefined = undefined;
     
     try {
+      // Parse JSON body (Next.js request.json() can only be called once)
       body = await request.json().catch(() => ({}));
-      // Get referrer from request body (from client or from previous 402 response)
-      referrer = body.referrer !== undefined ? body.referrer : undefined;
       
       console.log('═══════════════════════════════════════════════════════════');
       console.log('🔍 Generate Agent Request Body Parsing:');
+      console.log('  - Parsed body (full object):', JSON.stringify(body, null, 2));
+      console.log('  - Body type:', typeof body);
+      console.log('  - Body is array:', Array.isArray(body));
       console.log('  - Body keys:', Object.keys(body));
+      console.log('  - Body values:', Object.values(body));
       console.log('  - body.referrer:', body.referrer);
-      console.log('  - Extracted referrer:', referrer);
+      console.log('  - body.referrer type:', typeof body.referrer);
+      console.log('  - body.ext:', body.ext);
+      console.log('  - body.ext?.referrer:', body.ext?.referrer);
+      console.log('  - body.ext?.referrer type:', typeof body.ext?.referrer);
+      console.log('  - body.referrer === undefined:', body.referrer === undefined);
+      console.log('  - body.ext?.referrer === undefined:', body.ext?.referrer === undefined);
+      
+      // Get referrer from request body (from client or from previous 402 response)
+      // Support both formats:
+      // 1. Direct format: { "referrer": "..." }
+      // 2. Ext format: { "ext": { "referrer": "..." } } (for compatibility with 402 response format)
+      // Important: Check if referrer exists in body (even if it's empty string, it's still a valid value)
+      referrer = body.referrer !== undefined 
+        ? body.referrer 
+        : (body.ext?.referrer !== undefined ? body.ext.referrer : undefined);
+      
+      console.log('  - Extracted referrer (from body.referrer or body.ext.referrer):', referrer);
+      console.log('  - Extracted referrer type:', typeof referrer);
+      console.log('  - Extracted referrer === undefined:', referrer === undefined);
+      console.log('  - Extracted referrer === null:', referrer === null);
+      console.log('  - Extracted referrer === "":', referrer === '');
       console.log('═══════════════════════════════════════════════════════════');
     } catch (error) {
-      console.warn('⚠️  Failed to parse request body:', error);
+      console.error('⚠️  Failed to parse request body:', error);
+      console.error('  - Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('  - Error message:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        console.error('  - Error stack:', error.stack);
+      }
       body = {};
       referrer = undefined;
     }
