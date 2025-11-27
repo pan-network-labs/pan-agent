@@ -453,7 +453,7 @@ export async function callPromptAgentWithPayment(
 
       // 5. Wait for transaction confirmation
       const provider = new ethers.JsonRpcProvider(
-        process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/'
+        process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/'
       );
       
       let receipt = null;

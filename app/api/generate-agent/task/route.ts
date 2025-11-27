@@ -71,10 +71,10 @@ function getPaymentConfig() {
   const config = {
     price: priceWei, // Wei format
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
-    network: process.env.PAYMENT_NETWORK || 'BSCTest',
+    network: process.env.PAYMENT_NETWORK || 'BSC',
     address: paymentAddress, // Address for user to pay Generate Agent (regular wallet)
     minAmount: minAmountWei, // Wei format
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
   };
 
   return config;
@@ -113,7 +113,7 @@ async function validatePayment(xPaymentHeader: string | null): Promise<{ valid: 
     console.log('📝 Decoded hash starts with 0x:', tsHash.startsWith('0x'));
     console.log('📝 Decoded hash format valid:', /^0x[a-fA-F0-9]{64}$/.test(tsHash));
     
-    // 3. Connect to BSC Testnet
+    // 3. Connect to BSC Mainnet
     console.log('🌐 Connecting to RPC node:', PAYMENT_CONFIG.rpcUrl);
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     

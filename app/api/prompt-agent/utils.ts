@@ -57,7 +57,7 @@ export function getAgentCard(baseUrl: string) {
         "pricing": {
           "price": "0.001", // Prompt Agent price: 0.001 BNB
           "currency": "BNB",
-          "network": "BSCTest",
+          "network": "BSC",
           // Prompt Agent payment address: use smart contract address (contract directly receives payment)
           "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
           "note": "Calling this capability requires payment of 0.001 BNB (pay to smart contract address)"
@@ -103,7 +103,7 @@ export function getAgentCard(baseUrl: string) {
       "required": true,
       "defaultPrice": "0.001", // Prompt Agent price: 0.001 BNB
       "currency": "BNB",
-      "network": "BSCTest",
+      "network": "BSC",
       // Prompt Agent payment address: use smart contract address (contract directly receives payment)
       "address": process.env.PAYMENT_CONTRACT_ADDRESS || "",
       "minAmount": "0.001",

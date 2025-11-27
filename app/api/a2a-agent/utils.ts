@@ -49,10 +49,10 @@ export function getPaymentConfig() {
   const config = {
     price: priceWei, // Wei format
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
-    network: process.env.PAYMENT_NETWORK || 'BSCTest',
+    network: process.env.PAYMENT_NETWORK || 'BSC',
     address: paymentAddress,
     minAmount: minAmountWei, // Wei format
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
   };
 
   return config;
@@ -189,7 +189,7 @@ export function getAgentCard(baseUrl: string) {
         "pricing": {
           "price": "0.005", // Generate Agent price: 0.005 BNB
           "currency": "BNB",
-          "network": "BSCTest",
+          "network": "BSC",
           "address": process.env.PAYMENT_ADDRESS || "", // User pays Generate Agent directly
           "note": "Calling this capability requires payment of 0.005 BNB (paid directly to the agent's wallet address)"
         },
@@ -222,7 +222,7 @@ export function getAgentCard(baseUrl: string) {
       "required": true,
       "defaultPrice": "0.005", // Generate Agent price: 0.005 BNB
       "currency": "BNB",
-      "network": "BSCTest",
+      "network": "BSC",
       "address": process.env.PAYMENT_ADDRESS || "", // User pays Generate Agent directly
       "minAmount": "0.005",
       "pricingModel": "per_call",

@@ -16,7 +16,7 @@ export interface PaymentConfig {
 // Get payment configuration
 export function getPaymentConfig(): PaymentConfig {
   return {
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
     contractAddress: process.env.PAYMENT_CONTRACT_ADDRESS || '',
     signingServiceUrl: process.env.SIGNING_SERVICE_URL || 'http://localhost:3000/api/payment/sign',
     broadcastServiceUrl: process.env.BROADCAST_SERVICE_URL || 'http://localhost:3000/api/payment/broadcast',

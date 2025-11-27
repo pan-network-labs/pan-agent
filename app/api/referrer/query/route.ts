@@ -44,7 +44,7 @@ export async function OPTIONS() {
 // Get payment configuration
 function getPaymentConfig() {
   return {
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
     contractAddress: process.env.PAYMENT_CONTRACT_ADDRESS || '',
   };
 }

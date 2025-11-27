@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Create wallet and provider
-    const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+    const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/';
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const wallet = new ethers.Wallet(privateKey, provider);
 

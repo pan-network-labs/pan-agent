@@ -344,7 +344,7 @@ export default function Home() {
               address: data.address,
               amountWei: amountWei,
               currency: data.currency || 'BNB',
-              chain: data.network || 'BSCTest',
+              chain: data.network || 'BSC',
             });
             setShowPaymentModal(true);
             setLoading(false);
@@ -464,15 +464,15 @@ export default function Home() {
         throw new Error(`Failed to get network information: ${error.message || 'Unknown error'}`);
       }
       
-      // BSC Testnet chainId: 0x61 (97)
-      const bscTestnetChainId = '0x61';
+      // BSC Mainnet chainId: 0x38 (56)
+      const bscMainnetChainId = '0x38';
       
-      if (chainId !== bscTestnetChainId) {
-        // Try to switch to BSC Testnet
+      if (chainId !== bscMainnetChainId) {
+        // Try to switch to BSC Mainnet
         try {
           await ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: bscTestnetChainId }],
+            params: [{ chainId: bscMainnetChainId }],
           });
         } catch (switchError: any) {
           // If chain doesn't exist, add chain
@@ -482,21 +482,21 @@ export default function Home() {
                 method: 'wallet_addEthereumChain',
                 params: [
                   {
-                    chainId: bscTestnetChainId,
-                    chainName: 'BSC Testnet',
+                    chainId: bscMainnetChainId,
+                    chainName: 'BSC Mainnet',
                     nativeCurrency: {
                       name: 'BNB',
                       symbol: 'BNB',
                       decimals: 18,
                     },
-                    rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
-                    blockExplorerUrls: ['https://testnet.bscscan.com'],
+                    rpcUrls: ['https://bsc-dataseed1.binance.org/'],
+                    blockExplorerUrls: ['https://bscscan.com'],
                   },
                 ],
               });
             } catch (addError: any) {
               console.error('Failed to add chain:', addError);
-              throw new Error(`Failed to add BSC Testnet: ${addError.message || 'Unknown error'}`);
+              throw new Error(`Failed to add BSC Mainnet: ${addError.message || 'Unknown error'}`);
             }
           } else if (switchError.code === 4001) {
             throw new Error('User rejected network switch request');

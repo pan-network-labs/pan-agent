@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 
 export interface X402PaymentRequirement {
   scheme: string; // Payment scheme, e.g. "exact"
-  network: string; // Blockchain network, e.g. "BSCTest"
+  network: string; // Blockchain network, e.g. "BSC"
   currency: string; // Currency type, e.g. "BNB"
   address: string; // Payment address
   maxAmountRequired: string; // Maximum amount required for payment (Wei format, string)
@@ -33,7 +33,7 @@ export function createX402Response(
   config: {
     price: string; // Amount in Wei format (string), e.g. "20000000000000000"
     currency: string; // Currency type, e.g. "BNB"
-    network: string; // Network name, e.g. "BSCTest"
+    network: string; // Network name, e.g. "BSC"
     address: string; // Payment address
     resource: string; // Resource URL
     description?: string; // Resource description (optional)

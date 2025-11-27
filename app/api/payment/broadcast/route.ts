@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Connect to blockchain network
-    const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+    const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/';
     const provider = new ethers.JsonRpcProvider(rpcUrl);
 
     // 3. Broadcast transaction

@@ -38,10 +38,10 @@ function getPaymentConfig() {
   const config = {
     price: priceWei, // Wei format
     currency: process.env.PAYMENT_CURRENCY || 'BNB',
-    network: process.env.PAYMENT_NETWORK || 'BSCTest',
+    network: process.env.PAYMENT_NETWORK || 'BSC',
     address: contractAddress, // Use contract address
     minAmount: minAmountWei, // Wei format
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
   };
 
   return config;

@@ -48,11 +48,11 @@ export function getPaymentConfig() {
   const config = {
     price: priceWei, // Wei format
     currency: process.env.PROMPT_AGENT_CURRENCY || 'BNB',
-    network: process.env.PROMPT_AGENT_NETWORK || 'BSCTest',
+    network: process.env.PROMPT_AGENT_NETWORK || 'BSC',
     // Prompt Agent payment address: use smart contract address (contract directly receives payment, issues SBT to user)
     address: contractAddress,
     minAmount: minAmountWei, // Wei format
-    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+    rpcUrl: process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/',
   };
 
   return config;
