@@ -481,20 +481,33 @@ export async function makeContractPayment(
 }
 
 // Direct transfer
+// Note: This function is used by Generate Agent to pay Prompt Agent
+// So it should use PAYMENT_PRIVATE_KEY (Generate Agent's private key), not PROMPT_PRIVATE_KEY
 export async function makeDirectPayment(
   recipient: string,
   amount: string
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   try {
-    const config = getPaymentConfig();
+    // Use PAYMENT_PRIVATE_KEY directly (Generate Agent's private key for inter-agent payment)
+    const privateKey = process.env.PAYMENT_PRIVATE_KEY || '';
+    const rpcUrl = process.env.PAYMENT_RPC_URL || 'https://bsc-dataseed1.binance.org/';
     
-    if (!config.privateKey) {
-      return { success: false, error: 'PAYMENT_PRIVATE_KEY not configured' };
+    if (!privateKey) {
+      return { success: false, error: 'PAYMENT_PRIVATE_KEY not configured (required for Generate Agent to pay Prompt Agent)' };
     }
 
     // 1. Create wallet and provider
-    const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-    const wallet = new ethers.Wallet(config.privateKey, provider);
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('💰 makeDirectPayment: Generate Agent paying Prompt Agent');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Using PAYMENT_PRIVATE_KEY (Generate Agent wallet)');
+    console.log('Wallet address:', wallet.address);
+    console.log('Recipient:', recipient);
+    console.log('Amount:', amount, 'BNB');
+    console.log('═══════════════════════════════════════════════════════════');
 
     // 2. Send transaction
     const tx = await wallet.sendTransaction({
