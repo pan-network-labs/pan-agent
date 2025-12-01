@@ -22,27 +22,29 @@ async function getRedisClient() {
     return null;
   }
 
-  // If already loaded, return cached client
+  // If already loaded and connected, return cached client
   if (redisClient !== null) {
     return redisClient;
   }
 
   try {
     // Dynamic import to avoid errors when Redis is not configured
-    const Redis = (await import('ioredis')).default;
-    redisClient = new Redis(process.env.REDIS_URL!, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+    const { createClient } = await import('redis');
+    
+    // Create Redis client with REDIS_URL
+    const client = createClient({
+      url: process.env.REDIS_URL,
     });
     
     // Handle connection errors
-    redisClient.on('error', (error: any) => {
+    client.on('error', (error: any) => {
       console.error('Redis connection error:', error);
     });
     
+    // Connect to Redis
+    await client.connect();
+    
+    redisClient = client;
     console.log('✅ Redis client connected');
     return redisClient;
   } catch (error: any) {
@@ -66,6 +68,7 @@ export async function isTxHashUsed(txHash: string): Promise<boolean> {
 
   try {
     const key = `${TXHASH_KEY_PREFIX}${txHash}`;
+    // Check if key exists using EXISTS command
     const exists = await redis.exists(key);
     return exists === 1;
   } catch (error: any) {
@@ -91,7 +94,8 @@ export async function markTxHashAsUsed(txHash: string): Promise<void> {
   try {
     const key = `${TXHASH_KEY_PREFIX}${txHash}`;
     // Store with expiration time (24 hours) for automatic cleanup
-    await redis.setex(key, TXHASH_EXPIRE_SECONDS, '1');
+    // Using setEx method (set with expiration)
+    await redis.setEx(key, TXHASH_EXPIRE_SECONDS, '1');
     console.log('✅ Transaction hash marked as used in Redis:', txHash);
     console.log('   Expires in:', TXHASH_EXPIRE_SECONDS / 3600, 'hours');
   } catch (error: any) {
