@@ -85,7 +85,8 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     // ============================================================================
     // Check 1: Verify if transaction hash has been used before
     // ============================================================================
-    if (isTxHashUsed(tsHash)) {
+    const isUsed = await isTxHashUsed(tsHash);
+    if (isUsed) {
       console.error('═══════════════════════════════════════════════════════════');
       console.error('❌ Transaction hash already used:', tsHash);
       console.error('═══════════════════════════════════════════════════════════');
@@ -132,10 +133,18 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     
     // Get transaction block timestamp
     const txBlock = await provider.getBlock(tx.blockNumber);
+    if (!txBlock) {
+      console.error('Prompt Agent payment validation failed: transaction block not found', tx.blockNumber);
+      return { valid: false, error: 'Transaction block not found' };
+    }
     const txTimestamp = txBlock.timestamp; // Block timestamp in seconds
     
     // Get current latest block timestamp (use chain time, not server time)
     const currentBlock = await provider.getBlock('latest');
+    if (!currentBlock) {
+      console.error('Prompt Agent payment validation failed: current block not found');
+      return { valid: false, error: 'Current block not found' };
+    }
     const currentBlockTimestamp = currentBlock.timestamp; // Current block timestamp in seconds
     
     // Calculate time difference
@@ -153,7 +162,7 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     
     if (timeDiff > tenMinutesInSeconds) {
       // Mark as used to prevent repeated checks
-      markTxHashAsUsed(tsHash);
+      await markTxHashAsUsed(tsHash);
       
       console.error('═══════════════════════════════════════════════════════════');
       console.error('❌ Transaction hash expired (older than 10 minutes)');
@@ -229,11 +238,11 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     // ============================================================================
     // All validations passed, mark transaction hash as used
     // ============================================================================
-    markTxHashAsUsed(tsHash);
+    await markTxHashAsUsed(tsHash);
     
     console.log('═══════════════════════════════════════════════════════════');
     console.log('✅ Prompt Agent payment validation successful');
-    console.log('✅ Transaction hash marked as used:', tsHash);
+    console.log('✅ Transaction hash marked as used in KV:', tsHash);
     console.log('═══════════════════════════════════════════════════════════');
     return { valid: true };
   } catch (error) {
