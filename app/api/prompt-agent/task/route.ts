@@ -246,10 +246,11 @@ export async function POST(request: NextRequest) {
     console.log('⚠️  Please ensure this address is authorized as contract minter');
     console.log('═══════════════════════════════════════════════════════════');
 
-    // Important: Generate Agent has already paid 0.001 BNB to the contract via makeDirectPayment
-    // So Prompt Agent should call contract with value = 0 (no additional payment needed)
-    // The contract already received the payment from Generate Agent
-    const amountBNB = '0'; // Send 0 BNB because Generate Agent already paid
+    // Important: Contract requires value > 0 for mintNSBT/mintRSBT/mintSSBT methods
+    // Even though Generate Agent already paid 0.001 BNB to the contract via makeDirectPayment,
+    // the contract's mint methods require a payment amount in the transaction value
+    // So Prompt Agent needs to send the payment amount (0.001 BNB) when calling the contract
+    const amountBNB = ethers.formatEther(PAYMENT_CONFIG.price); // Send payment amount (0.001 BNB)
     
     console.log('═══════════════════════════════════════════════════════════');
     console.log('💰 Calling contract to mint SBT');
@@ -258,8 +259,9 @@ export async function POST(request: NextRequest) {
     console.log('Wallet address (minter):', promptWalletAddress);
     console.log('User address (recipient):', userAddress);
     console.log('SBT level:', rarity);
-    console.log('Payment amount (BNB):', amountBNB, '(Generate Agent already paid 0.001 BNB)');
+    console.log('Payment amount (BNB):', amountBNB);
     console.log('Contract address:', PAYMENT_CONFIG.address);
+    console.log('Note: Contract requires value > 0 for mint methods, so Prompt Agent must send payment amount');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🔍 Referrer Debug Information:');
     console.log('  - referrer variable value:', referrer);
@@ -284,14 +286,14 @@ export async function POST(request: NextRequest) {
     console.log('  - User address (SBT recipient):', userAddress);
     console.log('  - SBT rarity:', rarity);
     console.log('  - Contract address:', PAYMENT_CONFIG.address);
-    console.log('  - Payment amount: 0 BNB (Generate Agent already paid)');
+    console.log('  - Payment amount:', amountBNB, 'BNB (contract requires value > 0)');
     console.log('═══════════════════════════════════════════════════════════');
     console.log('⚠️  [PROMPT AGENT] This referrer will be passed to contract mintNSBT/mintRSBT/mintSSBT');
     console.log('   After minting, referrer will be stored in contract and can be queried via getPaymentInfo');
     console.log('═══════════════════════════════════════════════════════════');
     
     const sbtResult = await makeContractPayment(
-      amountBNB, // 0 BNB because Generate Agent already paid
+      amountBNB, // Payment amount (0.001 BNB) - contract requires value > 0
       `Prompt Agent Service Fee`,
       userAddress, // User address (receives SBT)
       PAYMENT_CONFIG.address, // Contract address
