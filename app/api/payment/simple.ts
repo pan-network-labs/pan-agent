@@ -108,12 +108,38 @@ export async function makeContractPayment(
     // 2. Check wallet balance
     const balance = await provider.getBalance(wallet.address);
     const value = ethers.parseEther(amount);
-    const minBalance = value + ethers.parseEther('0.001'); // Reserve some gas fees
+    // If amount is 0 (Generate Agent already paid), only need gas fees
+    // Otherwise, need payment amount + gas fees
+    const minBalance = amount === '0' 
+      ? ethers.parseEther('0.001') // Only gas fees needed
+      : value + ethers.parseEther('0.001'); // Payment amount + gas fees
     
     if (balance < minBalance) {
+      const privateKeySource = process.env.PROMPT_PRIVATE_KEY ? 'PROMPT_PRIVATE_KEY' : 'PAYMENT_PRIVATE_KEY';
+      const paymentNote = amount === '0' 
+        ? '(No payment needed, Generate Agent already paid. Only gas fees required.)'
+        : `(Payment amount: ${amount} BNB + gas fees)`;
+      const errorMessage = `Insufficient wallet balance. Required: ${ethers.formatEther(minBalance)} BNB, Current balance: ${ethers.formatEther(balance)} BNB ${paymentNote}\n\n` +
+        `Wallet address (minter): ${wallet.address}\n` +
+        `Private key source: ${privateKeySource}\n\n` +
+        `⚠️  Solution: Please transfer at least ${ethers.formatEther(minBalance)} BNB to address ${wallet.address} on BSC Mainnet\n` +
+        `   You can check the balance at: https://bscscan.com/address/${wallet.address}`;
+      
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ Failed to mint SBT');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('Wallet address used (minter):', wallet.address);
+      console.error('Error message:', errorMessage);
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('⚠️  Possible reasons:');
+      console.error('1. Wallet address is not authorized as contract minter');
+      console.error('2. Insufficient wallet balance');
+      console.error('3. Incorrect contract call parameters');
+      console.error('═══════════════════════════════════════════════════════════');
+      
       return {
         success: false,
-        error: `Insufficient wallet balance. Required: ${ethers.formatEther(minBalance)} BNB, Current balance: ${ethers.formatEther(balance)} BNB`,
+        error: errorMessage,
       };
     }
 

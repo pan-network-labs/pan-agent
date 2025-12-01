@@ -6,6 +6,7 @@
  */
 
 import { ethers } from 'ethers';
+import { isTxHashUsed, markTxHashAsUsed } from './txhash-store';
 
 // Get payment configuration
 export function getPaymentConfig() {
@@ -81,12 +82,37 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
     const tsHash = Buffer.from(xPaymentHeader, 'base64').toString('utf-8');
     console.log('Decoded transaction hash:', tsHash);
     
+    // ============================================================================
+    // Check 1: Verify if transaction hash has been used before
+    // ============================================================================
+    if (isTxHashUsed(tsHash)) {
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ Transaction hash already used:', tsHash);
+      console.error('═══════════════════════════════════════════════════════════');
+      return { 
+        valid: false, 
+        error: 'This payment transaction has already been used. Each transaction can only be used once.' 
+      };
+    }
+    console.log('✅ Transaction hash not used before, continuing validation...');
+    
     const provider = new ethers.JsonRpcProvider(PAYMENT_CONFIG.rpcUrl);
     const tx = await provider.getTransaction(tsHash);
     
     if (!tx) {
       console.error('Prompt Agent payment validation failed: transaction does not exist', tsHash);
       return { valid: false, error: 'Transaction does not exist' };
+    }
+    
+    if (!tx.blockNumber) {
+      console.error('Prompt Agent payment validation failed: transaction not yet confirmed', tsHash);
+      return { valid: false, error: 'Transaction not yet confirmed' };
+    }
+
+    const receipt = await provider.getTransactionReceipt(tsHash);
+    if (!receipt) {
+      console.error('Prompt Agent payment validation failed: transaction not yet confirmed', tsHash);
+      return { valid: false, error: 'Transaction not yet confirmed' };
     }
 
     console.log('Prompt Agent found transaction:', {
@@ -97,11 +123,53 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
       blockNumber: tx.blockNumber,
     });
 
-    const receipt = await provider.getTransactionReceipt(tsHash);
-    if (!receipt) {
-      console.error('Prompt Agent payment validation failed: transaction not yet confirmed', tsHash);
-      return { valid: false, error: 'Transaction not yet confirmed' };
+    // ============================================================================
+    // Check 2: Verify if transaction is older than 10 minutes (before payment validation)
+    // ============================================================================
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('⏰ Checking transaction timestamp (10 minute window)');
+    console.log('═══════════════════════════════════════════════════════════');
+    
+    // Get transaction block timestamp
+    const txBlock = await provider.getBlock(tx.blockNumber);
+    const txTimestamp = txBlock.timestamp; // Block timestamp in seconds
+    
+    // Get current latest block timestamp (use chain time, not server time)
+    const currentBlock = await provider.getBlock('latest');
+    const currentBlockTimestamp = currentBlock.timestamp; // Current block timestamp in seconds
+    
+    // Calculate time difference
+    const timeDiff = currentBlockTimestamp - txTimestamp;
+    const tenMinutesInSeconds = 10 * 60; // 10 minutes = 600 seconds
+    
+    console.log('Transaction block number:', tx.blockNumber);
+    console.log('Transaction block timestamp:', new Date(txTimestamp * 1000).toISOString());
+    console.log('Current block number:', currentBlock.number);
+    console.log('Current block timestamp:', new Date(currentBlockTimestamp * 1000).toISOString());
+    console.log('Time difference:', timeDiff, 'seconds (', (timeDiff / 60).toFixed(2), 'minutes)');
+    console.log('10 minute threshold:', tenMinutesInSeconds, 'seconds');
+    console.log('Is expired:', timeDiff > tenMinutesInSeconds ? '❌ Yes' : '✅ No');
+    console.log('═══════════════════════════════════════════════════════════');
+    
+    if (timeDiff > tenMinutesInSeconds) {
+      // Mark as used to prevent repeated checks
+      markTxHashAsUsed(tsHash);
+      
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ Transaction hash expired (older than 10 minutes)');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('Transaction hash:', tsHash);
+      console.error('Transaction age:', (timeDiff / 60).toFixed(2), 'minutes');
+      console.error('Maximum allowed age: 10 minutes');
+      console.error('═══════════════════════════════════════════════════════════');
+      
+      return { 
+        valid: false, 
+        error: `Payment transaction expired. Transaction is ${(timeDiff / 60).toFixed(2)} minutes old (maximum allowed: 10 minutes).` 
+      };
     }
+    
+    console.log('✅ Transaction timestamp check passed');
 
     console.log('Prompt Agent transaction information:');
     console.log('Transaction hash:', tsHash);
@@ -158,7 +226,15 @@ export async function validatePayment(xPaymentHeader: string | null): Promise<{ 
       return { valid: false, error: 'Transaction failed' };
     }
 
-    console.log('Prompt Agent payment validation successful');
+    // ============================================================================
+    // All validations passed, mark transaction hash as used
+    // ============================================================================
+    markTxHashAsUsed(tsHash);
+    
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ Prompt Agent payment validation successful');
+    console.log('✅ Transaction hash marked as used:', tsHash);
+    console.log('═══════════════════════════════════════════════════════════');
     return { valid: true };
   } catch (error) {
     console.error('Payment validation error:', error);
