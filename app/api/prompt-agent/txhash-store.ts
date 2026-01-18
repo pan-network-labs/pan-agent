@@ -19,6 +19,7 @@ let redisClient: any = null;
 async function getRedisClient() {
   // If not configured, return null
   if (!isRedisConfigured()) {
+    console.warn('Redis: REDIS_URL 未配置，未连接（txhash 防重复不生效）');
     return null;
   }
 
@@ -45,10 +46,10 @@ async function getRedisClient() {
     await client.connect();
     
     redisClient = client;
-    console.log('✅ Redis client connected');
+    console.log('Redis: 连接成功');
     return redisClient;
   } catch (error: any) {
-    console.error('Error creating Redis client:', error);
+    console.error('Redis: 连接失败', error?.message || error);
     return null;
   }
 }
